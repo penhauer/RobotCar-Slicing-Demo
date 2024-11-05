@@ -1,0 +1,1 @@
+gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! "video/x-raw(memory:NVMM), width=1280, height=720, format=NV12, framerate=30/1" ! nvvidconv ! "video/x-raw(memory:NVMM), format=I420" ! nvv4l2h264enc bitrate=1000000 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="$1" port="$2"

@@ -1,1 +1,1 @@
-bash stream_video.sh hpc4 5000
+bash stream_video.sh hpc4 5002

@@ -16,11 +16,17 @@ class ControllerServerProtocol(protocol.Protocol):
             print("Warning: messaged received but car is not set")
         else:
             try:
-                d = json.loads(message)
-                print("decoded dict: ", d)
-                control_the_car(d)
+                commands = message.strip().split("\n")
+                for command in commands:
+                    d = json.loads(command)
+                    print("decoded command: ", d)
+                    control_the_car(d)
             except Exception as e:
-                print("Error in decoding control payload. error:")
+                print("Error in decoding control payload. payload:")
+                print(f"|{message}|")
+                for command in commands:
+                    print(f"/{command}/")
+                print("error:")
                 print(e)
 
 

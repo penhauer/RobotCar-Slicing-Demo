@@ -32,13 +32,12 @@ class ControllerServerProtocol(protocol.Protocol):
 
 def control_the_car(d: dict):
     t = d["new"]["type"]
-    dd = {
-        "new": d["new"]["value"]
-    }
     if t == "steering":
-        car._on_steering(dd)
+        car._on_steering(d["new"])
+    elif t == "throttle":
+        car._on_throttle(d["new"])
     else:
-        car._on_throttle(dd)
+        raise Exception(f"Unknown command type '{t}'")
 
 
 class ControllerServerFactory(protocol.Factory):

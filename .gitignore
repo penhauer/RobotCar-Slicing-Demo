@@ -1,2 +1,6 @@
 **/.ipynb_checkpoints
 venv
+build
+dist
+jetracer.egg-info
+**/__pycache__/

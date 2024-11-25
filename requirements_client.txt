@@ -1,0 +1,4 @@
+traitlets
+keyboard
+# Should have GStreamer option enabled. Can be done with compiling the opencv-python's sourcecode.
+opentcv-python

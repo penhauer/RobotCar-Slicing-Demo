@@ -4,6 +4,7 @@
 
 
 function install-opencv-python() {
+  sudo apt-get install -y libgtk2.0-dev pkg-config
   TMPDIR=$(mktemp -d)
   pushd "${TMPDIR}"
 
@@ -25,7 +26,7 @@ function install-opencv-python() {
 if [[ ! -f "./venv/bin/activate" ]]; then
   python3 -m venv venv
   source ./venv/bin/activate
-  pip3 install -r requirements_client.txt
   install-opencv-python
+  pip3 install -r requirements_client.txt
 fi
 

@@ -27,6 +27,6 @@ if [[ ! -f "./venv/bin/activate" ]]; then
   python3 -m venv venv
   source ./venv/bin/activate
   install-opencv-python
-  pip3 install -r requirements_client.txt
+  pip3 install -r ./requirements.txt
 fi
 

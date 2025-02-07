@@ -17,9 +17,9 @@ def filter_red(frame):
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    red_lower1 = np.array([0, 70, 50])   # First range of red
+    red_lower1 = np.array([0, 100, 100])   # First range of red
     red_upper1 = np.array([10, 255, 255])
-    red_lower2 = np.array([170, 70, 50]) # Second range of red
+    red_lower2 = np.array([170, 100, 100]) # Second range of red
     red_upper2 = np.array([180, 255, 255])
 
     red_mask1 = cv2.inRange(hsv, red_lower1, red_upper1)

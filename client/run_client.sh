@@ -9,9 +9,20 @@ set -a # Automatically export variables
 source .env
 set +a
 
+
+if [ -z "${SERVER_CONTROL_PORT}" ]; then
+	echo "SERVER_CONTROL_PORT is not present in the environmental variables"
+fi
+
 if [ -z "${SERVER_STREAMING_PORT}" ]; then
 	echo "SERVER_STREAMING_PORT is not present in the environmental variables"
 	exit 1
 fi
 
-sudo ./venv/bin/python3 control_client.py "${SERVER_STREAMING_PORT}"
+process_video=""
+if [ "${PROCESS_VIDEO}" == "True" ]; then
+	process_video="--process_video"
+fi
+
+echo "${SERVER_CONTROL_PORT}" "${SERVER_STREAMING_PORT}"  "${process_video}"
+sudo ./venv/bin/python3 control_client.py "${SERVER_CONTROL_PORT}" "${SERVER_STREAMING_PORT}"  ${process_video}

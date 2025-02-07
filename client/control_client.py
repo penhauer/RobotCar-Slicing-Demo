@@ -46,11 +46,11 @@ class KeyboardController(traitlets.HasTraits):
         self.setup_trait_links()
 
         if args.process_video:
-            self.camera_thread = threading.Thread(target=capture_thread, args=(args.port, ))
+            self.camera_thread = threading.Thread(target=capture_thread, args=(args.streaming_port, ))
             self.camera_thread.start()
         else:
             print("Opening the camera display process")
-            subprocess.Popen(["./show_video.sh", str(args.port)])
+            subprocess.Popen(["./show_video.sh", str(args.streaming_port)])
         
         self.keyboard_thread = threading.Thread(target=self.keyboard_listener)
         self.keyboard_thread.start()
@@ -148,9 +148,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Process command-line arguments")
 
     parser.add_argument(
-        "port", 
+        "control_port", 
         type=int, 
-        help="The port number (mandatory argument)"
+        help="The control port number (mandatory argument)"
+    )
+    parser.add_argument(
+        "streaming_port", 
+        type=int, 
+        help="The video streaming port number (mandatory argument)"
     )
     parser.add_argument(
         "--process_video", 
@@ -159,13 +164,13 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    print(f"Port: {args.port}")
+    print(f"Port: {args.streaming_port}")
     print(f"Process Video: {args.process_video}")
     return args
 
 if __name__ == "__main__":
     args = parse_args()
 
-    client_socket = ClientSocket(server_ip='localhost', server_port=9999)
+    client_socket = ClientSocket(server_ip='localhost', server_port=args.control_port)
     client = KeyboardController(client_socket, args)
 

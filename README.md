@@ -1,5 +1,10 @@
-This respository explains the robotcar usecase. 
+This respository explains the robot cars usecase. There are two network slices in the testbed. The dedicated URLLC slice where worst case latency of 1ms is guaranteed and the best effort slice. The cars would stream the videos to a remote server on the edge where the video processing takes place. Furthermore, the server will 
 
+
+The cars then start moving toward an obstacle, as they stream their video. Once the car is about to hit an obstacle, the remote serve
+
+
+TODO: remember to install the jetracer module after checking to ws/pro 
 
 
 # Turning things on

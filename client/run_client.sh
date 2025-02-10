@@ -24,5 +24,4 @@ if [ "${PROCESS_VIDEO}" == "True" ]; then
 	process_video="--process_video"
 fi
 
-echo "${SERVER_CONTROL_PORT}" "${SERVER_STREAMING_PORT}"  "${process_video}"
 sudo ./venv/bin/python3 control_client.py "${SERVER_CONTROL_PORT}" "${SERVER_STREAMING_PORT}"  ${process_video}

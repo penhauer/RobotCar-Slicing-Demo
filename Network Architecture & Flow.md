@@ -105,18 +105,120 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ## Network Flow Diagram
 
-**Visualize the data and control flow in the system.**
+Visualize the data and control flow in the system.
+
+### 1. Network Data Flow (High-Level)
 
 ```
-+----------------+         UDP (Video Stream)         +------------------+
-|   Robot Car    |  --------------------------------> |   Client/Server  |
-| (Behind NAT)   |                                    | (Edge/Remote)    |
-|                | <--- TCP (Control Commands) -------|                  |
-+----------------+   (via Reverse SSH Tunnel)         +------------------+
++-------------------+         UDP (Video Stream)         +------------------+
+|   Jetson Nano     |  --------------------------------> |   PC/Client      |
+|   (Robot Car)     |                                    |  (Remote)        |
+|                   | <--- TCP (Control Commands) -------|                  |
++-------------------+   (via Reverse SSH Tunnel)         +------------------+
 ```
+**Legend:**
+- **UDP (Video Stream):** Jetson Nano → PC/Client (real-time video, e.g., GStreamer)
+- **TCP (Control Commands):** PC/Client → Jetson Nano (remote control, via SSH tunnel)
 
-- **Video Stream**: Car → Client (UDP, RTP/H.264, GStreamer)
-- **Control**: Client → Car (TCP, JSON, Twisted, via SSH tunnel)
+---
+
+### 2. Component Connection Flow
+
+```
++-------------------+
+|   Jetson Nano     |
++-------------------+
+ |   |   |   |   |   |   |
+ |   |   |   |   |   |   |
+CSI GPIO I2C USB Power WiFi
+ |   |   |   |   |   |   |
+ v   v   v   v   v   v   v
++-----+ +-----+ +-----+ +----------------+ +-------------+ +----------+
+|Camera| |Motor| |OLED | |Gamepad Receiver| |Battery Pack| |WiFi Mod. |
+|      | |Driver| |Disp.| +----------------+ +-------------+ +----------+
++-----+ +-----+ +-----+                                 
+      |         |                                       
+      +---------+                                       
+            |                                           
+            v                                           
+     +-------------------+                              
+     |   WiFi Router     |                              
+     +-------------------+                              
+            |                                           
+            v                                           
+     +------------------+                               
+     |   PC/Client      |                               
+     +------------------+                               
+```
+**Legend:**
+- **CSI, GPIO, I2C, USB, Power, WiFi:** Hardware and network interfaces
+- **WiFi Router:** Network hub for communication
+
+---
+
+### 3. Testbed/Network Emulation Flow
+
+```
++-------------------+         +------------------+
+|   Jetson Nano     |         |   PC/Client      |
++-------------------+         +------------------+
+          |                          ^
+          |                          |
+          v                          |
+   +-------------------+             |
+   |   WiFi Router     |-------------+
+   +-------------------+
+          |
+          v
+   +-------------------+
+   |  Testbed Scripts  |
+   | (add/remove       |
+   |  latency, etc.)   |
+   +-------------------+
+```
+**Legend:**
+- **Testbed Scripts:** Used to emulate network conditions (latency, etc.)
+
+---
+
+### 4. Full System Flow (Detailed)
+
+```
++-------------------+      CSI      +--------+
+|                   |-------------->|Camera  |
+|                   |               +--------+
+|                   |
+|                   |      GPIO     +--------------+
+|                   |-------------->|Motor Driver  |----+   PWM/Power   +--------+
+|                   |               +--------------+    +-------------->|Motors  |
+|                   |                                         |
+|   Jetson Nano     |      I2C      +-------------+           |
+|   (Robot Car)     |-------------->|OLED Display|           |
+|                   |               +-------------+           |
+|                   |                                         |
+|                   |      USB      +----------------+        |
+|                   |<-------------|Gamepad Receiver|         |
+|                   |               +----------------+        |
+|                   |                                         |
+|                   |      Power    +-------------+           |
+|                   |<-------------|Battery Pack  |           |
++-------------------+               +-------------+           |
+        | WiFi                                              WiFi
+        v                                                    v
++-------------------+                                 +------------------+
+|   WiFi Router     |<------------------------------->|   PC/Client      |
++-------------------+                                 +------------------+
+         ^                                                 ^
+         |                                                 |
+         +------------------- SSH Tunnel ------------------+
+         |                                                 |
+         +------------------- UDP Video Stream ------------+
+```
+**Legend:**
+- **CSI, GPIO, I2C, USB, Power:** Internal hardware connections
+- **WiFi:** Network connection
+- **SSH Tunnel:** TCP control commands (PC/Client → Jetson Nano)
+- **UDP Video Stream:** Video stream (Jetson Nano → PC/Client)
 
 ---
 

@@ -1,4 +1,29 @@
- # Network Architecture & Flow
+# Network Architecture & Flow
+
+---
+
+**A Comprehensive Guide to the Networked Robot Car System**
+
+*For the JetRacer Networks Lab Demo*
+
+---
+
+## Table of Contents
+1. [Overview](#overview)
+2. [Components and Their Network Roles](#components-and-their-network-roles)
+    - [Robot Car](#1-robot-car-car)
+    - [Client/Server](#2-clientserver-client)
+    - [Testbed](#3-testbed-testbed)
+    - [Environment Examples](#4-environment-examples-env_examples)
+3. [Network Flow Diagram](#network-flow-diagram)
+4. [Detailed Script/Config Reference](#detailed-scriptconfig-reference)
+5. [How to Use](#how-to-use)
+6. [Summary Table](#summary-table)
+7. [Best Practices & Notes](#best-practices--notes)
+8. [Setup Instructions](#setup-instructions)
+9. [References](#references)
+
+---
 
 ## Overview
 
@@ -7,6 +32,8 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 ---
 
 ## Components and Their Network Roles
+
+**Understand the function of each part in the system.**
 
 ### 1. **Robot Car (`/car`)**
 
@@ -76,7 +103,9 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ---
 
-## **Network Flow Diagram**
+## Network Flow Diagram
+
+**Visualize the data and control flow in the system.**
 
 ```
 +----------------+         UDP (Video Stream)         +------------------+
@@ -91,7 +120,9 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ---
 
-## **Detailed Script/Config Reference**
+## Detailed Script/Config Reference
+
+**Understand the purpose of each script and configuration file.**
 
 ### `/car/.env` (see `/env_examples/`)
 - Stores network configuration for the car.
@@ -141,7 +172,9 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ---
 
-## **How to Use**
+## How to Use
+
+**Step-by-step instructions for running the system.**
 
 1. **Set up the car and client with appropriate `.env` files** (copy from `/env_examples/`).
 2. **Start the car’s control server and video streamer**:
@@ -162,7 +195,7 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ---
 
-## **Summary Table**
+## Summary Table
 
 | Component        | Protocol | Direction        | Port/Config           | Script/Config                        | Purpose                       |
 |------------------|----------|------------------|-----------------------|--------------------------------------|-------------------------------|
@@ -173,16 +206,20 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 ---
 
-## **Best Practices & Notes**
+## Best Practices & Notes
+
+**Tips for robust and flexible operation.**
 
 - **Reverse SSH tunneling** is essential for NAT traversal, allowing the client to control the car even when the car is behind a firewall or NAT.
 - **GStreamer** is used for efficient, low-latency video streaming.
 - **Environment variables** make it easy to reconfigure the system for different cars or network setups.
 - **Testbed scripts** allow for robust testing under various network conditions, crucial for research and development in networked robotics.
 
-## **Setup Instructions**
+---
 
-Follow these steps to set up and run the networked robot car system:
+## Setup Instructions
+
+**Follow these steps to set up and run the networked robot car system:**
 
 ### 1. Prepare Environment Files
 - Copy an example environment file from `/env_examples/` to the `/car` and `/client` directories as `.env`.
@@ -249,4 +286,8 @@ Follow these steps to set up and run the networked robot car system:
 
 ---
 
-If you encounter issues, refer to the README.md for troubleshooting and additional details.
+## References
+- [Waveshare JetRacer Pro AI Kit Documentation](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit)
+- [GStreamer Documentation](https://gstreamer.freedesktop.org/documentation/)
+- [Twisted Python Networking Engine](https://twistedmatrix.com/trac/)
+- [tc netem (Linux Traffic Control)](https://wiki.linuxfoundation.org/networking/netem)

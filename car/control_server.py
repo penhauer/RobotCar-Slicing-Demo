@@ -66,7 +66,46 @@ def monitor_ssh_tunnel(ssh_process):
             break
         time.sleep(1)
 
-def start_reverse_ssh_tunnel(remote_host, remote_port, local_port):
+
+def find_pid_of_reverse_tunnel(remote_host, remote_port, remote_password):
+    remote_command = (
+        f"echo '{remote_password}'"
+        f"| sudo -S lsof 2>/dev/null -i :{remote_port}"
+        " | grep -E 'sshd.*IPv4.*LISTEN'"
+    )
+
+    ssh_command = f"ssh {remote_host} \"{remote_command}\" " + " | awk ' {print $2} ' "
+
+    result = subprocess.run(
+        ssh_command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+    pid = result.stdout.strip()
+    return pid
+
+
+def kill_pid(remote_host, remote_port, pid):
+    print(f"killing process {pid} on remote")
+    ssh_command = [
+        "ssh",
+        f"{remote_host}",
+        f"kill -9 {pid}"
+    ]
+
+    subprocess.run(ssh_command) 
+
+
+def kill_the_old_tunnel(remote_host, remote_port, remote_password):
+    pid = find_pid_of_reverse_tunnel(remote_host, remote_port, remote_password)
+    if pid:
+        kill_pid(remote_host, remote_port, pid)
+
+
+def start_reverse_ssh_tunnel(remote_host, remote_port, remote_password, local_port):
+    kill_the_old_tunnel(remote_host, remote_port, remote_password)
     ssh_command = [
         "ssh",
         "-N",
@@ -121,17 +160,17 @@ def start_the_car():
 def main():
     remote_host = sys.argv[1]
     remote_port = int(sys.argv[2])
+    remote_password = sys.argv[3]
     print("serving on port", remote_port, "and reverse ssh: ", remote_host, remote_port)
     local_port = remote_port
 
-    ssh_tunnel = start_reverse_ssh_tunnel(remote_host, remote_port, local_port)
+    
+    ssh_tunnel = start_reverse_ssh_tunnel(remote_host, remote_port, remote_password, local_port)
 
     if ssh_tunnel:
         try:
             threading.Thread(target=start_the_car).start()
             start_twisted_server(local_port)
-            # start_the_car()
-            # start_twisted_server(local_port)
         finally:
             ssh_tunnel.terminate()
             print("SSH tunnel closed.")

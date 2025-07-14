@@ -198,3 +198,22 @@
   ```
 
 ---
+
+## 4. Software Configuration & Updates
+
+**Keep your JetRacer up to date and install extra software if needed.**
+
+### 4.1. Update System Packages (Optional but Recommended)
+- In the Jupyter Lab terminal, run:
+  ```sh
+  sudo apt-get update
+  sudo apt-get upgrade
+  ```
+
+### 4.2. Install Additional Python Packages (If Needed)
+- If you need extra packages, use pip:
+  ```sh
+  pip3 install <package_name>
+  ```
+
+---

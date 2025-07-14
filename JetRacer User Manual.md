@@ -114,3 +114,87 @@
 - **UDP Video Stream:** Video stream (Jetson Nano → PC/Client)
 
 ---
+
+## 1. Hardware Setup & Assembly
+
+**Get started by assembling your JetRacer car.**
+
+### 1.1. Unboxing & Parts Checklist
+- JetRacer chassis and frame
+- Jetson Nano Developer Kit (not included in some kits)
+- Motors and wheels
+- Motor driver board
+- Battery holder (for four 18650 batteries)
+- OLED display (if included)
+- Camera module
+- Cables, screws, and standoffs
+- Gamepad controller and receiver
+
+### 1.2. Assemble the Chassis
+- Follow the assembly manual to:
+  - Attach the motors to the chassis using screws and brackets.
+  - Mount the wheels onto the motor shafts.
+  - Secure the Jetson Nano onto the chassis using standoffs.
+  - Connect the motor driver board to the motors and Jetson Nano GPIO pins.
+  - Install the battery holder and secure it in place.
+  - Mount the camera module to the front of the car and connect it to the Jetson Nano’s CSI port.
+  - Connect the OLED display (if present) to the appropriate header.
+  - Double-check all connections for tightness and correctness.
+
+### 1.3. Install the Batteries
+- Use four high-quality 18650 batteries (without protection plate).
+- Insert the batteries into the holder, ensuring correct polarity.
+- Charge the batteries fully before first use (recommended voltage per battery: 4.2V when fully charged).
+
+---
+
+## 2. Preparing the SD Card
+
+**Install the JetRacer operating system and software.**
+
+### 2.1. Download the JetRacer Image
+- Download the official JetRacer SD card image from the [Waveshare resources page](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit#Image).
+- Unzip the downloaded image file.
+
+### 2.2. Flash the Image to the SD Card
+- Use a tool like [Balena Etcher](https://www.balena.io/etcher/) to write the image to a microSD card (minimum 64GB recommended).
+- Insert the SD card into your computer, select the image file in Etcher, and flash it to the card.
+- Safely eject the SD card after flashing.
+
+### 2.3. Insert the SD Card
+- Insert the prepared microSD card into the slot on the underside of the Jetson Nano module.
+
+---
+
+## 3. First Boot & Initial Connections
+
+**Power on your JetRacer and connect for the first time.**
+
+### 3.1. Powering On
+- Ensure all hardware is assembled and batteries are installed.
+- Turn on the power switch located on the car chassis.
+- The OLED display (if present) should light up, showing IP address, memory, and power status.
+
+### 3.2. Connecting to Your PC
+- Use a micro USB cable to connect the Jetson Nano to your PC for initial setup.
+- Wait for the Jetson Nano to boot up (may take a few minutes on first boot).
+
+### 3.3. Accessing Jupyter Lab
+- On your PC, open a web browser and go to `http://192.168.55.1:8888`.
+- Log in with the default password: `jetson`.
+- If you do not see the Jupyter Lab interface, ensure your PC is connected to the Jetson Nano via USB and that the Nano is powered on.
+
+### 3.4. Connecting to WiFi (Recommended)
+- In Jupyter Lab, open a new terminal (`File` → `New` → `Terminal`).
+- Use the following commands to scan and connect to WiFi:
+  ```sh
+  sudo nmcli device wifi list
+  sudo nmcli device wifi connect <SSID> password <your_password>
+  ```
+- Confirm connection with:
+  ```sh
+  ifconfig
+  ping google.com
+  ```
+
+---

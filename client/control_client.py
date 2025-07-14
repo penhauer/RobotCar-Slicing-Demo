@@ -22,7 +22,8 @@ class ClientSocket():
         self.sock.connect((self.server_ip, self.server_port))
 
     def send(self, msg):
-        self.sock.sendall(json.dumps(msg).encode('ascii'))
+        m = json.dumps(msg) + "\n"
+        self.sock.sendall(m.encode('ascii'))
 
     def reset_connection(self):
         self.close()

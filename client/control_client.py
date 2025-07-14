@@ -15,7 +15,11 @@ class ClientSocket():
     def __init__(self, server_ip, server_port) -> None:
         self.server_ip = server_ip
         self.server_port = server_port
-        self.connect()
+        self.connected = False
+        try:
+            self.connect()
+        except:
+            pass
 
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,6 +28,23 @@ class ClientSocket():
     def send(self, msg):
         m = json.dumps(msg) + "\n"
         self.sock.sendall(m.encode('ascii'))
+
+    def send_twice(self, msg):
+        try:
+            self.send(msg)
+        except Exception as e:
+            print("Send failed with error. Restarting the socket.")
+            print(e)
+            self.try_with_reset(msg)
+
+    def try_with_reset(self, msg):
+        try:
+            self.reset_connection()
+            self.send(msg)
+        except Exception as e:
+            print("Could not set up the connection again")
+            print(e)
+            print("Ignoring sending the message.")
 
     def reset_connection(self):
         self.close()
@@ -132,18 +153,16 @@ class KeyboardController(traitlets.HasTraits):
 
     @traitlets.observe('change')
     def _on_change(self, d):
-        print(f"Sending message to server: {d}")
         msg = self.change
         msg = {
             'new': d['new'],
         }
+        print(f"Sending message to server: {msg}")
         try:
-            self.client_socket.send(msg)
+            self.client_socket.send_twice(msg)
         except Exception as e:
-            print("Send failed with error. Restarting the socket.")
+            print("Send failed with error.")
             print(e)
-            self.client_socket.reset_connection()
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Process command-line arguments")

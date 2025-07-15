@@ -217,3 +217,66 @@
   ```
 
 ---
+
+## 5. Operating the Car
+
+**Drive manually, collect data, and run autonomous driving.**
+
+### 5.1. Manual Control (Teleoperation)
+- Plug the gamepad receiver into your PC (not the Jetson Nano).
+- Test the gamepad at [html5gamepad.com](https://html5gamepad.com/) and note the device index.
+- In Jupyter Lab, open `/jetracer/notebooks/teleoperation.ipynb` and run the cells to enable manual control.
+- Use the left joystick to steer and the right joystick to control speed.
+
+### 5.2. Data Collection for AI
+- Open `/jetracer/notebooks/interactive-regression.ipynb` in Jupyter Lab.
+- Use manual control to drive the car and collect images/steering data.
+- Save data for several laps around your track.
+
+### 5.3. Training and Autonomous Driving
+- In the same notebook, set the number of epochs and train the model using your collected data.
+- After training, evaluate the model’s performance.
+- Open `/jetracer/notebooks/road_following.ipynb` and run it to enable autonomous driving.
+- Adjust parameters (steering offset, throttle) as needed for best results.
+
+---
+
+## 6. Troubleshooting
+
+**Solve common problems with your JetRacer.**
+
+- **Car Does Not Move:**
+  - Check the ESC switch on the chassis; toggle if needed.
+  - Ensure batteries are charged and installed correctly.
+  - Verify all cables and connections.
+- **Camera Issues:**
+  - If the camera fails, restart it with: `sudo systemctl restart nvargus-daemon` in a terminal.
+- **Gamepad Not Detected:**
+  - Make sure the receiver is plugged into your PC, not the Jetson Nano.
+  - Test at [html5gamepad.com](https://html5gamepad.com/).
+- **Software Errors:**
+  - Ensure you are using the correct JetRacer image and software versions as per the documentation.
+
+---
+
+## 7. Maintenance & Safety
+
+**Keep your JetRacer in top condition and operate safely.**
+
+- **Battery Care:**
+  - Use high-quality 18650 batteries (e.g., Sanyo, Panasonic).
+  - Recharge when voltage drops below 10V.
+  - Do not use batteries with a protective plate.
+- **Power Adapter:**
+  - Only use the 8.4V adapter for charging batteries, not for powering the Jetson Nano directly.
+- **General Care:**
+  - Regularly check for loose connections and physical damage.
+  - Store the car in a dry, safe place when not in use.
+
+---
+
+## References
+- [Waveshare JetRacer Pro AI Kit Documentation](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit)
+- [Waveshare JetRacer Resource Page](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit#Image)
+- [Balena Etcher](https://www.balena.io/etcher/)
+- [HTML5 Gamepad Tester](https://html5gamepad.com/) 8`

@@ -9,6 +9,7 @@
 ---
 
 ## Table of Contents
+0. [Note on IP Addresses](#note-on-ip-addresses)
 1. [Overview](#overview)
 2. [Components and Their Network Roles](#components-and-their-network-roles)
     - [Robot Car](#1-robot-car-car)
@@ -21,7 +22,10 @@
 6. [Summary Table](#summary-table)
 7. [Best Practices & Notes](#best-practices--notes)
 8. [Setup Instructions](#setup-instructions)
-9. [References](#references)
+9. [NAT Traversal, Port Mapping, and SSH Tunneling](#nat-traversal-port-mapping-and-ssh-tunneling)
+10. [USRP Hardware](#usrp-hardware)
+11. [Cross-Reference](#cross-reference)
+12. [References](#references)
 
 ---
 
@@ -388,8 +392,60 @@ CSI GPIO I2C USB Power WiFi
 
 ---
 
+## NAT Traversal, Port Mapping, and SSH Tunneling
+
+### NAT Traversal
+Many components in this system are behind NAT (Network Address Translation), which means their private IP addresses are not directly accessible from outside networks. To enable remote control and communication, the system uses SSH tunneling and port forwarding.
+
+### SSH Tunnel Example
+To forward a port from a remote machine (e.g., hpc1) to your local machine, use:
+```bash
+ssh hpc1 -L localhost:9000:localhost:9000
+```
+This command forwards port 9000 on your local machine to port 9000 on hpc1, allowing you to access services behind NAT.
+
+### Port Mapping Table Example
+| Src IP         | Src Port | Dst IP           | Dst Port |
+|----------------|----------|------------------|----------|
+| 203.0.113.8    | 443      | 198.51.100.8     | 55921    |
+| 192.168.50.10  | 9000     | 203.0.113.20     | 9000     |
+| 10.0.0.92      | 9000     | 10.0.0.1         | 9000     |
+
+This table shows how a packet's source and destination IP/port can be mapped as it traverses NATs and tunnels. Substitute your actual network addresses as needed.
+
+### Network Flow with NAT and SSH Tunnel
+- The car (or USRP) may be on a private subnet (e.g., 10.x.x.x).
+- hpc1 acts as a bridge, with multiple interfaces (e.g., 192.168.x.x, 10.x.x.x, 203.0.113.x).
+- SSH tunneling is used to forward control ports from the car to the client, bypassing NAT.
+- UDP video and TCP control traffic are mapped through the appropriate ports.
+
+---
+
+## USRP Hardware
+If your setup includes a USRP (Universal Software Radio Peripheral), it acts as a software-defined radio device for wireless communication or network emulation. In the network, it may be connected to hpc1 and used for advanced wireless experiments or as part of the testbed.
+
+- **USRP Role:**
+  - Connects to hpc1 for radio/network experiments.
+  - May be used to emulate wireless links or inject/test traffic.
+  - Not required for basic JetRacer operation, but referenced in advanced testbed setups.
+
+---
+
+## Cross-Reference
+- For a user-friendly, step-by-step guide, see **JetRacer User Manual.md**.
+- For troubleshooting, see **Troubleshooting Guide.md**.
+
+---
+
 ## References
 - [Waveshare JetRacer Pro AI Kit Documentation](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit)
 - [GStreamer Documentation](https://gstreamer.freedesktop.org/documentation/)
 - [Twisted Python Networking Engine](https://twistedmatrix.com/trac/)
 - [tc netem (Linux Traffic Control)](https://wiki.linuxfoundation.org/networking/netem)
+
+---
+
+# Note on IP Addresses
+All IP addresses in this document are **examples**. Replace them with the actual addresses used in your network or testbed. For public IP examples, we use documentation ranges (e.g., 203.0.113.x per RFC5737).
+
+---

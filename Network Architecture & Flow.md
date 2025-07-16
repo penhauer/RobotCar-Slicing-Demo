@@ -415,9 +415,11 @@ This table shows how a packet's source and destination IP/port can be mapped as 
 
 ### Network Flow with NAT and SSH Tunnel
 - The car (or USRP) may be on a private subnet (e.g., 10.x.x.x).
-- hpc1 acts as a bridge, with multiple interfaces (e.g., 192.168.x.x, 10.x.x.x, 203.0.113.x).
+- The PC acts as a bridge, with multiple interfaces (e.g., 192.168.x.x, 10.x.x.x, 203.0.113.x).
 - SSH tunneling is used to forward control ports from the car to the client, bypassing NAT.
 - UDP video and TCP control traffic are mapped through the appropriate ports.
+
+<img width="2837" height="921" alt="image" src="https://github.com/user-attachments/assets/3e0781fb-e4b5-49ba-a7d6-2ca36d2c7a32" />
 
 ---
 

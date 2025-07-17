@@ -427,7 +427,7 @@ This table shows how a packet's source and destination IP/port can be mapped as 
 If your setup includes a USRP (Universal Software Radio Peripheral), it acts as a software-defined radio device for wireless communication or network emulation. In the network, it may be connected to hpc1 and used for advanced wireless experiments or as part of the testbed.
 
 - **USRP Role:**
-  - Connects to hpc1 for radio/network experiments.
+  - Connects to the PC for radio/network experiments.
   - May be used to emulate wireless links or inject/test traffic.
   - Not required for basic JetRacer operation, but referenced in advanced testbed setups.
 

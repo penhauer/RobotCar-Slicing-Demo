@@ -31,9 +31,60 @@
 
 ## Overview
 
-This project demonstrates a robot car streaming video to a remote server (the client) over a network, with control commands sent back to the car. The setup is designed to work in a testbed with two network slices: a **dedicated URLLC slice** (ultra-reliable low-latency communication) and a **best-effort slice**. The car is typically behind a NAT, so reverse SSH tunneling is used for control. Video is streamed using GStreamer pipelines over UDP, and control commands are sent over TCP.
+
+<img width="8892" height="2416" alt="image" src="https://github.com/user-attachments/assets/0f35b21c-97d9-4abf-91b6-af6e2d9bf80f" />
+
+
+
+This project demonstrates a robot car streaming video to a remote server (the client) over a network, with control commands sent back to the car. The setup is designed to work in a 5G testbed with slicing capabilites. Two slices are configured for every UE; a **dedicated URLLC slice** (ultra-reliable low-latency communication) and a **best-effort slice**. Video streamed from UE1 (first car) passes thorugh the dedicated slice1, while for UE2, the traffic goes through the best effort slice2.
+
+The video is streamed to an edge server where controlling commands are sent back to the car; forming a closed control loop. In this case, UE1 is expected to perform better since it is attached to a dedicated slice. Conversely, in case an obstacle is close to UE2 (second car) as it is moving forward, the action to stop the car may not arrive in time to prevent the car from hitting the obstacle.
+
+
+
+The cars are typically behind a NAT, so reverse SSH tunneling is used for control ([see](#nat-traversal-port-mapping-and-ssh-tunneling) ) . 
+
+Video is streamed using GStreamer pipelines over UDP, and control commands are sent over TCP.
 
 ---
+
+
+## How to Use
+
+
+### Connecting to 4G/5G testbed
+
+
+
+
+### Car (Controller Server)
+
+
+
+### Controller (Controller Client)
+
+**Step-by-step instructions for running the system.**
+
+1. **Set up the car and client with appropriate `.env` files** (copy from `/env_examples/`).
+2. **Start the car’s control server and video streamer**:
+   ```bash
+   ./run_control_server.sh
+   ./run_camera_video_streamer.sh
+   ```
+3. **On the client/server, install requirements and start the client**:
+   ```bash
+   ./install_client_requirements.sh
+   sudo ./run_client.sh
+   ```
+4. **(Optional) Use testbed scripts to simulate network conditions**:
+   ```bash
+   ./add-latency.sh
+   ./remove-latency.sh
+   ```
+
+---
+
+
 
 ## Components and Their Network Roles
 
@@ -278,28 +329,6 @@ CSI GPIO I2C USB Power WiFi
 
 ---
 
-## How to Use
-
-**Step-by-step instructions for running the system.**
-
-1. **Set up the car and client with appropriate `.env` files** (copy from `/env_examples/`).
-2. **Start the car’s control server and video streamer**:
-   ```bash
-   ./run_control_server.sh
-   ./run_camera_video_streamer.sh
-   ```
-3. **On the client/server, install requirements and start the client**:
-   ```bash
-   ./install_client_requirements.sh
-   sudo ./run_client.sh
-   ```
-4. **(Optional) Use testbed scripts to simulate network conditions**:
-   ```bash
-   ./add-latency.sh
-   ./remove-latency.sh
-   ```
-
----
 
 ## Summary Table
 

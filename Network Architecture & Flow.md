@@ -40,54 +40,58 @@ This project demonstrates a robot car streaming video to a remote server (the cl
 
 The video is streamed to an edge server where controlling commands are sent back to the car; forming a closed control loop. In this case, UE1 is expected to perform better since it is attached to a dedicated slice. Conversely, in case an obstacle is close to UE2 (second car) as it is moving forward, the action to stop the car may not arrive in time to prevent the car from hitting the obstacle.
 
-
-
-The cars are typically behind a NAT, so reverse SSH tunneling is used for control ([see](#nat-traversal-port-mapping-and-ssh-tunneling) ) . 
-
-Video is streamed using GStreamer pipelines over UDP, and control commands are sent over TCP.
-
 ---
 
 
 ## How to Use
 
+The cars come with both Wi-Fi card and 5G module. Either can be used for internet connectivity.
+
 
 #### Connecting to 4G/5G testbed
 
 
-You can follow the instructions on how to setup the 5G module [here](https://www.waveshare.com/wiki/SIM8200EA-M2_5G_for_Jetson_Nano#Document). For the 5G module to operate, its driver should be installed on the car. 
-
-
-Taken from the documentation:
+The instructions on how to setup the 5G module can be found [here](https://www.waveshare.com/wiki/SIM8200EA-M2_5G_for_Jetson_Nano#Document). For the 5G module to operate, its driver should be installed on the car. Taken from the documentation:
 
 ```bash
-sudo apt-get install p7zip-full
-wget https://files.waveshare.com/upload/0/07/Sim8200_for_jetsonnano.7z
-7z x Sim8200_for_jetsonnano.7z -r -o./Sim8200_for_jetsonnano
-sudo chmod 777 -R Sim8200_for_jetsonnano
-cd Sim8200_for_jetsonnano
-sudo ./install.sh
+$ sudo apt-get install p7zip-full
+$ wget https://files.waveshare.com/upload/0/07/Sim8200_for_jetsonnano.7z
+$ 7z x Sim8200_for_jetsonnano.7z -r -o./Sim8200_for_jetsonnano
+$ sudo chmod 777 -R Sim8200_for_jetsonnano
+$ cd Sim8200_for_jetsonnano
+$ sudo ./install.sh
 
-cd Goonline
-make
+$ cd Goonline
+$ make
 
 # Now finnally try connecting to the testbed.
-sudo ./simcom-cm
+$ sudo ./simcom-cm
 ```
 
-Before the last step, make sure the 5G module's green light is blinking, indicating the module's ready to connect.
+Before the last step, make sure the 5G module's LED is blinking green, indicating the module's ready to connect. Note that the module has a red LED, which indicates the module is powered.
 
-Once the module is connected, the interface wwan0 should be created and should get an internal ip address related to the RAN. If you send traffic through this interface, it will go through the RAN and testbed.
+Once the module is connected, the interface wwan0 should be created and should get an ip address internal to the RAN. If you send traffic through this interface, it will go through the RAN and testbed.
 
 ```bash
-ping -I wwan0 8.8.8.8
+$ ping -I wwan0 8.8.8.8
 ```
 
 Alternatively, you can add a default route so all 
-traffic is sent from wwan0. It might be added by default using the script but there might be other default paths like wlan0 for wifi or eth0. Make sure the default traffic passes through the radio interface established between module and the testbed.
+traffic is sent from `wwan0`. This might done by default using the script but there might be other default paths like `wlan0` for Wi-Fi or eth0. Make sure the default traffic passes through the radio interface established between module and the testbed.
+
+Check the routing table to make sure the default path is through `wwan0`.
+
+```
+$ ip route
+```
 
 #### Connecting to Wi-Fi
 
+To connect to Wi-Fi, simply run:
+
+```
+$ sudo nmtui
+```
 
 
 ### Car (Controller Server)

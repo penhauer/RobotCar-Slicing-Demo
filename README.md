@@ -19,7 +19,7 @@
 
 
 
-This project demonstrates a robot car streaming video to a remote server (the client) over a network, with control commands sent back to the car. The setup is designed to work in a 5G testbed with slicing capabilites. Two slices are configured for every UE; a **dedicated URLLC slice** (ultra-reliable low-latency communication) and a **best-effort slice**. Video streamed from UE1 (first car) passes thorugh the dedicated slice1, while for UE2, the traffic goes through the best effort slice2.
+This project demonstrates a robot car streaming video to a remote server (the controller) over a network, with control commands sent back to the car. The setup is designed to work in a 5G testbed with slicing capabilites. Two slices are configured for every UE; a **dedicated URLLC slice** (ultra-reliable low-latency communication) and a **best-effort slice**. Video streamed from UE1 (first car) passes thorugh the dedicated slice1, while for UE2, the traffic goes through the best effort slice2.
 
 The video is streamed to an edge server where controlling commands are sent back to the car; forming a closed control loop. In this case, UE1 is expected to perform better since it is attached to a dedicated slice. Conversely, in case an obstacle is close to UE2 (second car) as it is moving forward, the action to stop the car may not arrive in time to prevent the car from hitting the obstacle.
 
@@ -29,9 +29,9 @@ The video is streamed to an edge server where controlling commands are sent back
 
 ### High-Level Steps
 
-1. Prepare environment files for car and client (see detailed steps below).
+1. Prepare environment files for the car and the controller (see detailed steps below).
 2. Set up the car: install dependencies, configure, and start services.
-3. Set up the client/server: install dependencies and start the client.
+3. Set up the conttroller: install dependencies and start the controller.
 4. (Optional) Use testbed scripts to simulate network conditions.
 
 For detailed step-by-step instructions, see below.
@@ -39,13 +39,13 @@ For detailed step-by-step instructions, see below.
 ### Step-by-Step Instructions
 
 1. **Prepare Environment Files**
-   - Copy an example environment file from `/env_examples/` to the `/car` and `/client` directories as `.env`.
+   - Copy an example environment file from `/env_examples/` to the `/car` and `/controller` directories as `.env`.
    - Edit the `.env` files as needed for your network setup.
      ```bash
      # Example for the car
      cp env_examples/env_car1 car/.env
-     # Example for the client
-     cp env_examples/env_car1 client/.env
+     # Example for the controller
+     cp env_examples/env_car1 controller/.env
      # Edit the files to match your server IP and ports
      ```
    - *Refer to this section for all environment file setup. Troubleshooting and script references will assume you have completed this step.*
@@ -76,24 +76,23 @@ For detailed step-by-step instructions, see below.
      ./run_camera_video_streamer.sh
      ```
 
-4. **Set Up the Client/Server**
-   - On the client/server machine, install Python dependencies:
+4. **Set Up the controller**
+   - On the client machine, install Python dependencies:
      ```bash
-     cd client
-     ./install_client_requirements.sh
+     cd controller
+     ./install_controller_requirements.sh
      ```
 
-5. **Start the Client**
-   - Run the client to connect to the car and receive video/control:
+5. **Start the Controller**
+   - Run the controller to connect to the car and receive video/control:
      ```bash
-     sudo ./run_client.sh
+     sudo ./run_controller.sh
      ```
-   - **Note:** The client requires the `keyboard` Python library, which must be run with super user privileges (sudo).
-   - The client can run in two modes:
+   - **Note:** The controller requires the `keyboard` Python library, which must be run with super user privileges (sudo).
+   - The controller can run in two modes:
      - **No video processing**: Just displays the video stream.
      - **Video processing**: Processes the video stream for obstacle detection (set `PROCESS_VIDEO=True` in `.env` or pass the flag if supported).
      When video processing is active, if you press the key `m` on the keyboard, the car will move forward untill a red obstacle is detected. Note that while the car is automatically moving forward, pressing any other key would stop this automatic move.
-   - *Note: Additional client modes and runner script improvements are under development.*
 
 6. **(Optional) Use Testbed Scripts for Network Emulation**
    - To add artificial latency to the network (for testing):
@@ -113,11 +112,11 @@ For detailed step-by-step instructions, see below.
 *For detailed script explanations, see the [Detailed Script/Config Reference](#detailed-scriptconfig-reference) section.*
 
 ### 1. **Robot Car (`/car`)**
-- **Video Streaming**: Captures video from the car’s camera and sends it over UDP to the client/server.
-- **Control Server**: Receives movement commands from the client. Uses a reverse SSH tunnel for NAT traversal.
+- **Video Streaming**: Captures video from the car’s camera and sends it over UDP to the controller.
+- **Control Server**: Receives movement commands from the controller. Uses a reverse SSH tunnel for NAT traversal.
 - **Environment Variables**: Set in `.env` (see Setup & Usage section).
 
-### 2. **Client/Server (`/client`)**
+### 2. **Controller (`/controller`)**
 - **Video Reception**: Receives the UDP video stream. Optionally, processes the video using OpenCV.
 - **Control Client**: Connects to the car’s control server via the reverse SSH tunnel. Sends movement commands (WASD keys) over TCP.
 
@@ -136,9 +135,9 @@ The control commands are sent from the controller to the car over the SSH connec
 
 ```
 +-------------------+         UDP (Video Stream)              +------------------+
-|   Jetson Nano     |  -------------------------------------> |      Client      |
-|   (Robot Car)     |                                         |     (Remote      |
-|                   | <-------- TCP (Control Commands) -------|    controller)   |
+|                   |  -------------------------------------> |                  |
+|        Car        |                                         |    Coontroller   |
+|                   | <-------- TCP (Control Commands) -------|                  |
 +-------------------+     (via the SSH Tunnel established)    +------------------+
 ```
 
@@ -151,40 +150,40 @@ The control commands are sent from the controller to the car over the SSH connec
 - Stores network configuration for the car.
 
 ### `/car/run_camera_video_streamer.sh`
-- Loads `.env`, checks for `SERVER_IP` and `SERVER_STREAMING_PORT`.
-- Runs `./stream_video.sh "${SERVER_IP}" "${SERVER_STREAMING_PORT}"`.
+- Loads `.env`, checks for `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT`.
+- Runs `./stream_video.sh "${CONTROLLER_IP}" "${CONTROLLER_STREAMING_PORT}"`.
 
 ### `/car/stream_video.sh`
 - GStreamer pipeline:
   ```bash
   gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! ... ! udpsink host="$1" port="$2"
   ```
-- Streams H.264 video over UDP to the client.
+- Streams H.264 video over UDP to the controller.
 
 ### `/car/run_control_server.sh`
-- Loads `.env`, checks for `SERVER_IP` and `SERVER_CONTROL_PORT`.
-- Runs `python3 control_server.py "${SERVER_IP}" "${SERVER_CONTROL_PORT}"`.
+- Loads `.env`, checks for `CONTROLLER_IP` and `CONTROLLER_CONTROL_PORT`.
+- Runs `python3 control_server.py "${CONTROLLER_IP}" "${CONTROLLER_CONTROL_PORT}"`.
 
 ### `/car/control_server.py`
 - Listens for TCP connections on the control port.
 - Receives JSON commands, controls the car.
-- Establishes a reverse SSH tunnel to the client/server for NAT traversal.
+- Establishes a reverse SSH tunnel to the controller for NAT traversal.
 
-### `/client/.env` (see Setup & Usage)
-- Stores network configuration for the client/server.
+### `/controller/.env` (see Setup & Usage)
+- Stores network configuration for the controller.
 
-### `/client/run_client.sh`
+### `/controller/run_controller.sh`
 - Loads `.env`, checks for required ports.
-- Runs the client Python script with the correct ports.
+- Runs the controller Python script with the correct ports.
 
-### `/client/show_video.sh`
+### `/controller/show_video.sh`
 - GStreamer pipeline:
   ```bash
   gst-launch-1.0 -vv udpsrc port="${1}" ... ! autovideosink sync=false
   ```
 - Receives and displays the video stream.
 
-### `/client/control_client.py`
+### `/controller/control_client.py`
 - Connects to the car’s control server (via SSH tunnel).
 - Sends movement commands.
 - Optionally processes video for obstacle detection.
@@ -210,15 +209,15 @@ This guide provides solutions to common issues you may encounter when setting up
   - **Solution:**
     - See Setup & Usage above for how to copy and edit `.env` files.
 
-- **Error:** `SERVER_IP`, `SERVER_CONTROL_PORT`, or `SERVER_STREAMING_PORT` not present in the environmental variables.
+- **Error:** `CONTROLLER_IP`, `CONTROLLER_CONTROL_PORT`, or `CONTROLLER_STREAMING_PORT` not present in the environmental variables.
   - **Solution:**
     - See Setup & Usage above for how to edit `.env` files.
 
 ### 2. Video Streaming Problems
-- **Error:** `Unable to open video stream.` or no video window appears on the client.
+- **Error:** `Unable to open video stream.` or no video window appears on the controller.
   - **Solution:**
-    - Ensure the car is running `run_camera_video_streamer.sh` and the client is running `show_video.sh` or the client Python script.
-    - Check that the `SERVER_IP` and `SERVER_STREAMING_PORT` match on both car and client.
+    - Ensure the car is running `run_camera_video_streamer.sh` and the controller is running `show_video.sh` or the controller Python script.
+    - Check that the `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT` match on both car and controller.
     - Make sure the network allows UDP traffic on the streaming port.
     - If using 5G, verify the car has a valid network connection (see 5G section).
 

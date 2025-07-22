@@ -11,21 +11,16 @@
 ## Table of Contents
 0. [Note on IP Addresses](#note-on-ip-addresses)
 1. [Overview](#overview)
-2. [Components and Their Network Roles](#components-and-their-network-roles)
-    - [Robot Car](#1-robot-car-car)
-    - [Client/Server](#2-clientserver-client)
-    - [Testbed](#3-testbed-testbed)
-    - [Environment Examples](#4-environment-examples-env_examples)
-3. [Network Flow Diagram](#network-flow-diagram)
-4. [Detailed Script/Config Reference](#detailed-scriptconfig-reference)
-5. [How to Use](#how-to-use)
+2. [Setup & Usage](#setup--usage)
+3. [Components and Their Network Roles](#components-and-their-network-roles)
+4. [Network Flow Diagram](#network-flow-diagram)
+5. [Detailed Script/Config Reference](#detailed-scriptconfig-reference)
 6. [Summary Table](#summary-table)
 7. [Best Practices & Notes](#best-practices--notes)
-8. [Setup Instructions](#setup-instructions)
-9. [NAT Traversal, Port Mapping, and SSH Tunneling](#nat-traversal-port-mapping-and-ssh-tunneling)
-10. [USRP Hardware](#usrp-hardware)
-11. [Cross-Reference](#cross-reference)
-12. [References](#references)
+8. [NAT Traversal, Port Mapping, and SSH Tunneling](#nat-traversal-port-mapping-and-ssh-tunneling)
+9. [USRP Hardware](#usrp-hardware)
+10. [Cross-Reference](#cross-reference)
+11. [References](#references)
 
 ---
 
@@ -42,107 +37,108 @@ The video is streamed to an edge server where controlling commands are sent back
 
 ---
 
+## Setup & Usage
 
-## How to Use
+### High-Level Steps
 
-The cars come with both Wi-Fi card and 5G module. Either can be used for internet connectivity.
+1. Prepare environment files for car and client (see detailed steps below).
+2. Set up the car: install dependencies, configure, and start services.
+3. Set up the client/server: install dependencies and start the client.
+4. (Optional) Use testbed scripts to simulate network conditions.
 
+For detailed step-by-step instructions, see below.
 
-#### Connecting to 4G/5G testbed
+### Step-by-Step Instructions
 
+1. **Prepare Environment Files**
+   - Copy an example environment file from `/env_examples/` to the `/car` and `/client` directories as `.env`.
+   - Edit the `.env` files as needed for your network setup.
+     ```bash
+     # Example for the car
+     cp env_examples/env_car1 car/.env
+     # Example for the client
+     cp env_examples/env_car1 client/.env
+     # Edit the files to match your server IP and ports
+     ```
+   - *Refer to this section for all environment file setup. Troubleshooting and script references will assume you have completed this step.*
 
-The instructions on how to setup the 5G module can be found [here](https://www.waveshare.com/wiki/SIM8200EA-M2_5G_for_Jetson_Nano#Document). For the 5G module to operate, its driver should be installed on the car.
+2. **Set Up the Car**
+   - On the robot car, install required Python dependencies:
+     ```bash
+     cd car
+     python3 -m venv venv
+     source venv/bin/activate
+     pip3 install -r requirements.txt
+     ```
+   - **You must also install the `jetracer` package from NVIDIA for the control server to work.**
+     - If not already installed, follow the instructions here: https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit
+   - (Optional) Adjust power and WiFi settings for optimal performance:
+     ```bash
+     ./low_power.sh
+     ./wifi-decrease-latency.sh
+     ```
 
-```bash
-$ sudo apt-get install p7zip-full
-$ wget https://files.waveshare.com/upload/0/07/Sim8200_for_jetsonnano.7z
-$ 7z x Sim8200_for_jetsonnano.7z -r -o./Sim8200_for_jetsonnano
-$ sudo chmod 777 -R Sim8200_for_jetsonnano
-$ cd Sim8200_for_jetsonnano
-$ sudo ./install.sh
+3. **Start the Car Services**
+   - Start the control server (enables remote control):
+     ```bash
+     ./run_control_server.sh
+     ```
+   - Start the video streaming service:
+     ```bash
+     ./run_camera_video_streamer.sh
+     ```
 
-$ cd Goonline
-$ make
+4. **Set Up the Client/Server**
+   - On the client/server machine, install Python dependencies:
+     ```bash
+     cd client
+     ./install_client_requirements.sh
+     ```
 
-# Now finnally try connecting to the testbed.
-$ sudo ./simcom-cm
-```
+5. **Start the Client**
+   - Run the client to connect to the car and receive video/control:
+     ```bash
+     sudo ./run_client.sh
+     ```
+   - **Note:** The client requires the `keyboard` Python library, which must be run with super user privileges (sudo).
+   - The client can run in two modes:
+     - **No video processing**: Just displays the video stream.
+     - **Video processing**: Processes the video stream for obstacle detection (set `PROCESS_VIDEO=True` in `.env` or pass the flag if supported).
+   - *Note: Additional client modes and runner script improvements are under development.*
 
-Before the last step, make sure the 5G module's LED is blinking green, indicating the module's ready to connect. Note that the module has a red LED, which indicates the module is powered.
-
-Once the module is connected, the interface wwan0 should be created and should get an ip address internal to the RAN. If you send traffic through this interface, it will go through the RAN and testbed.
-
-```bash
-$ ping -I wwan0 8.8.8.8
-```
-
-Alternatively, you can add a default route so all 
-traffic is sent from `wwan0`. This might done by default using the script but there might be other default paths like `wlan0` for Wi-Fi or eth0. Make sure the default traffic passes through the radio interface established between module and the testbed.
-
-Check the routing table to make sure the default path is through `wwan0`.
-
-```
-$ ip route
-```
-
-#### Connecting to Wi-Fius
-
-To connect to Wi-Fi, simply run:
-
-```
-$ sudo nmtui
-```
-
-
-### Car (Controller Server)
-
-
-
-### Controller (Controller Client)
-
-**Step-by-step instructions for running the system.**
-
-1. **Set up the car and client with appropriate `.env` files** (copy from `/env_examples/`).
-2. **Start the car’s control server and video streamer**:
-   ```bash
-   ./run_control_server.sh
-   ./run_camera_video_streamer.sh
-   ```
-3. **On the client/server, install requirements and start the client**:
-   ```bash
-   ./install_client_requirements.sh
-   sudo ./run_client.sh
-   ```
-4. **(Optional) Use testbed scripts to simulate network conditions**:
-   ```bash
-   ./add-latency.sh
-   ./remove-latency.sh
-   ```
+6. **(Optional) Use Testbed Scripts for Network Emulation**
+   - To add artificial latency to the network (for testing):
+     ```bash
+     cd testbed
+     ./add-latency.sh
+     ```
+   - To remove the artificial latency:
+     ```bash
+     ./remove-latency.sh
+     ```
 
 ---
-
-
 
 ## Components and Their Network Roles
 
 **Understand the function of each part in the system.**
 
+*For detailed script explanations, see the [Detailed Script/Config Reference](#detailed-scriptconfig-reference) section.*
+
 ### 1. **Robot Car (`/car`)**
-- **Video Streaming**: Uses a GStreamer pipeline (`stream_video.sh`) to capture video from the car’s camera and send it over UDP to the client/server.
-- **Control Server**: Runs a Twisted-based TCP server (`control_server.py`) to receive movement commands from the client. Uses a reverse SSH tunnel for NAT traversal.
-- **Environment Variables**: Set in `.env` (see Setup Instructions above).
-- **Scripts**: See Detailed Script/Config Reference for all script usage and details.
+- **Video Streaming**: Captures video from the car’s camera and sends it over UDP to the client/server.
+- **Control Server**: Receives movement commands from the client. Uses a reverse SSH tunnel for NAT traversal.
+- **Environment Variables**: Set in `.env` (see Setup & Usage section).
 
 ### 2. **Client/Server (`/client`)**
-- **Video Reception**: Receives the UDP video stream using a GStreamer pipeline (`show_video.sh`). Optionally, processes the video using OpenCV (`video_processing.py`).
-- **Control Client**: Connects to the car’s control server via the reverse SSH tunnel. Sends movement commands (WASD keys) over TCP. Can run in two modes (see Setup Instructions).
-- **Scripts**: See Detailed Script/Config Reference for all script usage and details.
+- **Video Reception**: Receives the UDP video stream. Optionally, processes the video using OpenCV.
+- **Control Client**: Connects to the car’s control server via the reverse SSH tunnel. Sends movement commands (WASD keys) over TCP.
 
 ### 3. **Testbed (`/testbed`)**
-- **Network Slicing and Emulation**: `add-latency.sh` and `remove-latency.sh` are used to simulate different network conditions.
+- **Network Slicing and Emulation**: Used to simulate different network conditions.
 
 ### 4. **Environment Examples (`/env_examples`)**
-- Provide sample `.env` files for different cars or scenarios. See Setup Instructions for usage.
+- Provide sample `.env` files for different cars or scenarios. See Setup & Usage section for usage.
 
 ---
 
@@ -269,7 +265,7 @@ CSI GPIO I2C USB Power WiFi
 
 **This is the only section with detailed script and configuration file explanations.**
 
-### `/car/.env` (see Setup Instructions)
+### `/car/.env` (see Setup & Usage)
 - Stores network configuration for the car.
 
 ### `/car/run_camera_video_streamer.sh`
@@ -292,7 +288,7 @@ CSI GPIO I2C USB Power WiFi
 - Receives JSON commands, controls the car.
 - Establishes a reverse SSH tunnel to the client/server for NAT traversal.
 
-### `/client/.env` (see Setup Instructions)
+### `/client/.env` (see Setup & Usage)
 - Stores network configuration for the client/server.
 
 ### `/client/run_client.sh`
@@ -331,86 +327,12 @@ CSI GPIO I2C USB Power WiFi
 
 **Tips for robust and flexible operation.**
 
-- **Reverse SSH tunneling** is essential for NAT traversal, allowing the client to control the car even when the car is behind a firewall or NAT.
-- **GStreamer** is used for efficient, low-latency video streaming.
-- **Environment variables** make it easy to reconfigure the system for different cars or network setups.
-- **Testbed scripts** allow for robust testing under various network conditions, crucial for research and development in networked robotics.
+- **Reverse SSH tunneling** is essential for NAT traversal, allowing the client to control the car even when the car is behind a firewall or NAT. (See NAT Traversal section for details.)
+- **GStreamer** is used for efficient, low-latency video streaming. (See Detailed Script/Config Reference for details.)
+- **Environment variables** make it easy to reconfigure the system for different cars or network setups. (See Setup & Usage section for details.)
+- **Testbed scripts** allow for robust testing under various network conditions, crucial for research and development in networked robotics. (See Setup & Usage and Detailed Script/Config Reference for details.)
 
 *Best practices are summarized here. For rationale, see the relevant sections above.*
-
----
-
-## Setup Instructions
-
-**Follow these steps to set up and run the networked robot car system:**
-
-### 1. Prepare Environment Files
-- Copy an example environment file from `/env_examples/` to the `/car` and `/client` directories as `.env`.
-- Edit the `.env` files as needed for your network setup.
-  ```bash
-  # Example for the car
-  cp env_examples/env_car1 car/.env
-  # Example for the client
-  cp env_examples/env_car1 client/.env
-  # Edit the files to match your server IP and ports
-  ```
-
-*Refer to this section for all environment file setup. Troubleshooting and script references will assume you have completed this step.*
-
-### 2. Set Up the Car
-- On the robot car, install required Python dependencies:
-  ```bash
-  cd car
-  python3 -m venv venv
-  source venv/bin/activate
-  pip3 install -r requirements.txt
-  ```
-- **You must also install the `jetracer` package from NVIDIA for the control server to work.**
-  - If not already installed, follow the instructions here: https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit
-- (Optional) Adjust power and WiFi settings for optimal performance:
-  ```bash
-  ./low_power.sh
-  ./wifi-decrease-latency.sh
-  ```
-
-### 3. Start the Car Services
-- Start the control server (enables remote control):
-  ```bash
-  ./run_control_server.sh
-  ```
-- Start the video streaming service:
-  ```bash
-  ./run_camera_video_streamer.sh
-  ```
-
-### 4. Set Up the Client/Server
-- On the client/server machine, install Python dependencies:
-  ```bash
-  cd client
-  ./install_client_requirements.sh
-  ```
-
-### 5. Start the Client
-- Run the client to connect to the car and receive video/control:
-  ```bash
-  sudo ./run_client.sh
-  ```
-- **Note:** The client requires the `keyboard` Python library, which must be run with super user privileges (sudo).
-- The client can run in two modes:
-  - **No video processing**: Just displays the video stream.
-  - **Video processing**: Processes the video stream for obstacle detection (set `PROCESS_VIDEO=True` in `.env` or pass the flag if supported).
-- *Note: Additional client modes and runner script improvements are under development.*
-
-### 6. (Optional) Use Testbed Scripts for Network Emulation
-- To add artificial latency to the network (for testing):
-  ```bash
-  cd testbed
-  ./add-latency.sh
-  ```
-- To remove the artificial latency:
-  ```bash
-  ./remove-latency.sh
-  ```
 
 ---
 
@@ -474,11 +396,11 @@ This guide provides solutions to common issues you may encounter when setting up
 ## 1. Environment File Issues
 - **Error:** `.env file does not exist.`
   - **Solution:**
-    - See Setup Instructions above for how to copy and edit `.env` files.
+    - See Setup & Usage above for how to copy and edit `.env` files.
 
 - **Error:** `SERVER_IP`, `SERVER_CONTROL_PORT`, or `SERVER_STREAMING_PORT` not present in the environmental variables.
   - **Solution:**
-    - See Setup Instructions above for how to edit `.env` files.
+    - See Setup & Usage above for how to edit `.env` files.
 
 ---
 

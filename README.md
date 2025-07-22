@@ -1,28 +1,16 @@
-# Network Architecture & Flow
-
----
-
-**A Comprehensive Guide to the Networked Robot Car System**
-
-*For the JetRacer Networks Lab Demo*
-
----
 
 ## Table of Contents
-0. [Note on IP Addresses](#note-on-ip-addresses)
-1. [Overview](#overview)
-2. [Setup & Usage](#setup--usage)
-3. [Components and Their Network Roles](#components-and-their-network-roles)
-4. [Network Flow Diagram](#network-flow-diagram)
-5. [Detailed Script/Config Reference](#detailed-scriptconfig-reference)
-6. [Summary Table](#summary-table)
-7. [Best Practices & Notes](#best-practices--notes)
-8. [NAT Traversal, Port Mapping, and SSH Tunneling](#nat-traversal-port-mapping-and-ssh-tunneling)
-9. [USRP Hardware](#usrp-hardware)
-10. [Cross-Reference](#cross-reference)
-11. [References](#references)
 
----
+<ol>
+  <li><a href="#overview">Overview</a></li>
+  <li><a href="#setup--usage">Setup &amp; Usage</a></li>
+  <li><a href="#components-and-their-network-roles">Components and Their Network Roles</a></li>
+  <li><a href="#network-flow">Network Flow</a></li>
+  <li><a href="#detailed-scriptconfig-reference">Detailed Script/Config Reference</a></li>
+  <li><a href="#references">References</a></li>
+  <li><a href="#troubleshooting-guide">Troubleshooting Guide</a></li>
+</ol>
+
 
 ## Overview
 
@@ -104,6 +92,7 @@ For detailed step-by-step instructions, see below.
    - The client can run in two modes:
      - **No video processing**: Just displays the video stream.
      - **Video processing**: Processes the video stream for obstacle detection (set `PROCESS_VIDEO=True` in `.env` or pass the flag if supported).
+     When video processing is active, if you press the key `m` on the keyboard, the car will move forward untill a red obstacle is detected. Note that while the car is automatically moving forward, pressing any other key would stop this automatic move.
    - *Note: Additional client modes and runner script improvements are under development.*
 
 6. **(Optional) Use Testbed Scripts for Network Emulation**
@@ -116,8 +105,6 @@ For detailed step-by-step instructions, see below.
      ```bash
      ./remove-latency.sh
      ```
-
----
 
 ## Components and Their Network Roles
 
@@ -140,126 +127,21 @@ For detailed step-by-step instructions, see below.
 ### 4. **Environment Examples (`/env_examples`)**
 - Provide sample `.env` files for different cars or scenarios. See Setup & Usage section for usage.
 
----
 
-## Network Flow Diagram
+## Network Flow
 
-Visualize the data and control flow in the system.
+This is a high-level view view of the network connections between the car and the controller. First, the car establishes an SSH connection to a publicly available server which acts as the client or the remote controller of the car. This is to bypass any NAT between the car to the controller. This is exactly the case for our labscale 5G testbed.
 
-### 1. Network Data Flow (High-Level)
-
-```
-+-------------------+         UDP (Video Stream)         +------------------+
-|   Jetson Nano     |  --------------------------------> |   PC/Client      |
-|   (Robot Car)     |                                    |  (Remote)        |
-|                   | <--- TCP (Control Commands) -------|                  |
-+-------------------+   (via Reverse SSH Tunnel)         +------------------+
-```
-**Legend:**
-- **UDP (Video Stream):** Jetson Nano → PC/Client (real-time video, e.g., GStreamer)
-- **TCP (Control Commands):** PC/Client → Jetson Nano (remote control, via SSH tunnel)
-
----
-
-### 2. Component Connection Flow
+The control commands are sent from the controller to the car over the SSH connection established. The video stream from the car is sent over UDP to the controller.
 
 ```
-+-------------------+
-|   Jetson Nano     |
-+-------------------+
- |   |   |   |   |   |   |
- |   |   |   |   |   |   |
-CSI GPIO I2C USB Power WiFi
- |   |   |   |   |   |   |
- v   v   v   v   v   v   v
-+-----+ +-----+ +-----+ +----------------+ +-------------+ +----------+
-|Camera| |Motor| |OLED | |Gamepad Receiver| |Battery Pack| |WiFi Mod. |
-|      | |Driver| |Disp.| +----------------+ +-------------+ +----------+
-+-----+ +-----+ +-----+                                 
-      |         |                                       
-      +---------+                                       
-            |                                           
-            v                                           
-     +-------------------+                              
-     |   WiFi Router     |                              
-     +-------------------+                              
-            |                                           
-            v                                           
-     +------------------+                               
-     |   PC/Client      |                               
-     +------------------+                               
++-------------------+         UDP (Video Stream)              +------------------+
+|   Jetson Nano     |  -------------------------------------> |      Client      |
+|   (Robot Car)     |                                         |     (Remote      |
+|                   | <-------- TCP (Control Commands) -------|    controller)   |
++-------------------+     (via the SSH Tunnel established)    +------------------+
 ```
-**Legend:**
-- **CSI, GPIO, I2C, USB, Power, WiFi:** Hardware and network interfaces
-- **WiFi Router:** Network hub for communication
 
----
-
-### 3. Testbed/Network Emulation Flow
-
-```
-+-------------------+         +------------------+
-|   Jetson Nano     |         |   PC/Client      |
-+-------------------+         +------------------+
-          |                          ^
-          |                          |
-          v                          |
-   +-------------------+             |
-   |   WiFi Router     |-------------+
-   +-------------------+
-          |
-          v
-   +-------------------+
-   |  Testbed Scripts  |
-   | (add/remove       |
-   |  latency, etc.)   |
-   +-------------------+
-```
-**Legend:**
-- **Testbed Scripts:** Used to emulate network conditions (latency, etc.)
-
----
-
-### 4. Full System Flow (Detailed)
-
-```
-+-------------------+      CSI      +--------+
-|                   |-------------->|Camera  |
-|                   |               +--------+
-|                   |
-|                   |      GPIO     +--------------+
-|                   |-------------->|Motor Driver  |----+   PWM/Power   +--------+
-|                   |               +--------------+    +-------------->|Motors  |
-|                   |                                         |
-|   Jetson Nano     |      I2C      +-------------+           |
-|   (Robot Car)     |-------------->|OLED Display|           |
-|                   |               +-------------+           |
-|                   |                                         |
-|                   |      USB      +----------------+        |
-|                   |<-------------|Gamepad Receiver|         |
-|                   |               +----------------+        |
-|                   |                                         |
-|                   |      Power    +-------------+           |
-|                   |<-------------|Battery Pack  |           |
-+-------------------+               +-------------+           |
-        | WiFi                                              WiFi
-        v                                                    v
-+-------------------+                                 +------------------+
-|   WiFi Router     |<------------------------------->|   PC/Client      |
-+-------------------+                                 +------------------+
-         ^                                                 ^
-         |                                                 |
-         +------------------- SSH Tunnel ------------------+
-         |                                                 |
-         +------------------- UDP Video Stream ------------+
-```
-**Legend:**
-- **CSI, GPIO, I2C, USB, Power:** Internal hardware connections
-- **WiFi:** Network connection
-- **SSH Tunnel:** TCP control commands (PC/Client → Jetson Nano)
-- **UDP Video Stream:** Video stream (Jetson Nano → PC/Client)
-
----
 
 ## Detailed Script/Config Reference
 
@@ -310,90 +192,20 @@ CSI GPIO I2C USB Power WiFi
 ### `/testbed/add-latency.sh` and `/testbed/remove-latency.sh`
 - Add or remove artificial network latency for test purposes.
 
----
-
-## Summary Table
-
-| Component        | Protocol | Direction        | Port/Config           | Script/Config                        | Purpose                       |
-|------------------|----------|------------------|-----------------------|--------------------------------------|-------------------------------|
-| Video Stream     | UDP      | Car → Client     | SERVER_STREAMING_PORT | stream_video.sh, show_video.sh       | Real-time video transmission  |
-| Control          | TCP      | Client → Car     | SERVER_CONTROL_PORT   | control_server.py, control_client.py | Remote car control            |
-| SSH Tunnel       | TCP      | Car → Client     | (dynamic)             | control_server.py                    | NAT traversal for control     |
-| Testbed Latency  | N/A      | N/A              | N/A                   | add-latency.sh, remove-latency.sh    | Network emulation/testing     |
-
----
-
-## Best Practices & Notes
-
-**Tips for robust and flexible operation.**
-
-- **Reverse SSH tunneling** is essential for NAT traversal, allowing the client to control the car even when the car is behind a firewall or NAT. (See NAT Traversal section for details.)
-- **GStreamer** is used for efficient, low-latency video streaming. (See Detailed Script/Config Reference for details.)
-- **Environment variables** make it easy to reconfigure the system for different cars or network setups. (See Setup & Usage section for details.)
-- **Testbed scripts** allow for robust testing under various network conditions, crucial for research and development in networked robotics. (See Setup & Usage and Detailed Script/Config Reference for details.)
-
-*Best practices are summarized here. For rationale, see the relevant sections above.*
-
----
-
-## NAT Traversal, Port Mapping, and SSH Tunneling
-
-### NAT Traversal
-Many components in this system are behind NAT (Network Address Translation), which means their private IP addresses are not directly accessible from outside networks. To enable remote control and communication, the system uses SSH tunneling and port forwarding.
-
-### SSH Tunnel Example
-To forward a port from a remote machine (e.g., hpc1) to your local machine, use:
-```bash
-ssh hpc1 -R localhost:9000:localhost:9000
-```
-This command forwards port 9000 on your local machine to port 9000 on hpc1, allowing you to access services behind NAT.
-
-### Port Mapping Table Example
-| Src IP         | Src Port | Dst IP           | Dst Port |
-|----------------|----------|------------------|----------|
-| 203.0.113.8    | 443      | 198.51.100.8     | 55921    |
-| 192.168.50.10  | 9000     | 203.0.113.20     | 9000     |
-| 10.0.0.92      | 9000     | 10.0.0.1         | 9000     |
-
-This table shows how a packet's source and destination IP/port can be mapped as it traverses NATs and tunnels. Substitute your actual network addresses as needed.
-
-### Network Flow with NAT and SSH Tunnel
-- The car (or USRP) may be on a private subnet (e.g., 10.x.x.x).
-- The PC acts as a bridge, with multiple interfaces (e.g., 192.168.x.x, 10.x.x.x, 203.0.113.x).
-- SSH tunneling is used to forward control ports from the car to the client, bypassing NAT.
-- UDP video and TCP control traffic are mapped through the appropriate ports.
-
-<img width="2837" height="921" alt="image" src="https://github.com/user-attachments/assets/3e0781fb-e4b5-49ba-a7d6-2ca36d2c7a32" />
-
----
-
-## Cross-Reference
-- For a user-friendly, step-by-step guide, see **JetRacer User Manual.md**.
-- For troubleshooting, see **Troubleshooting Guide.md**.
-
----
 
 ## References
+- For a user-friendly, step-by-step guide, see **JetRacer User Manual.md**.
 - [Waveshare JetRacer Pro AI Kit Documentation](https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit)
 - [GStreamer Documentation](https://gstreamer.freedesktop.org/documentation/)
 - [Twisted Python Networking Engine](https://twistedmatrix.com/trac/)
 - [tc netem (Linux Traffic Control)](https://wiki.linuxfoundation.org/networking/netem)
 
----
 
-# Note on IP Addresses
-All IP addresses in this document are **examples**. Replace them with the actual addresses used in your network or testbed. For public IP examples, we use documentation ranges (e.g., 203.0.113.x per RFC5737).
-
----
-
-
-# Troubleshooting Guide 
+## Troubleshooting Guide 
 
 This guide provides solutions to common issues you may encounter when setting up or running the networked robot car system.
 
----
-
-## 1. Environment File Issues
+### 1. Environment File Issues
 - **Error:** `.env file does not exist.`
   - **Solution:**
     - See Setup & Usage above for how to copy and edit `.env` files.
@@ -402,9 +214,7 @@ This guide provides solutions to common issues you may encounter when setting up
   - **Solution:**
     - See Setup & Usage above for how to edit `.env` files.
 
----
-
-## 2. Video Streaming Problems
+### 2. Video Streaming Problems
 - **Error:** `Unable to open video stream.` or no video window appears on the client.
   - **Solution:**
     - Ensure the car is running `run_camera_video_streamer.sh` and the client is running `show_video.sh` or the client Python script.

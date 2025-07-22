@@ -9,9 +9,9 @@ set -a # Automatically export variables
 source .env
 set +a
 
-if [ -z "${CONTROLLER_IP}" ]; then
-	echo "CONTROLLER_IP is not present in the environmental variables"
-	exit 1
+
+if [ -z "${CONTROLLER_CONTROL_PORT}" ]; then
+	echo "CONTROLLER_CONTROL_PORT is not present in the environmental variables"
 fi
 
 if [ -z "${CONTROLLER_STREAMING_PORT}" ]; then
@@ -19,5 +19,9 @@ if [ -z "${CONTROLLER_STREAMING_PORT}" ]; then
 	exit 1
 fi
 
-./stream_video.sh "${CONTROLLER_IP}" "${CONTROLLER_STREAMING_PORT}"
+process_video=""
+if [ "${PROCESS_VIDEO}" == "True" ]; then
+	process_video="--process_video"
+fi
 
+sudo ./venv/bin/python3 control_client.py "${CONTROLLER_CONTROL_PORT}" "${CONTROLLER_STREAMING_PORT}"  ${process_video}

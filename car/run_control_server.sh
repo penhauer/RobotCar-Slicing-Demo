@@ -9,13 +9,13 @@ set -a # Automatically export variables
 source .env
 set +a
 
-if [ -z "${SERVER_IP}" ]; then
-	echo "SERVER_IP is not present in the environmental variables"
+if [ -z "${CONTROLLER_IP}" ]; then
+	echo "CONTROLLER_IP is not present in the environmental variables"
 	exit 1
 fi
 
-if [ -z "${SERVER_CONTROL_PORT}" ]; then
-	echo "SERVER_CONTROL_PORT is not present in the environmental variables"
+if [ -z "${CONTROLLER_CONTROL_PORT}" ]; then
+	echo "CONTROLLER_CONTROL_PORT is not present in the environmental variables"
 	exit 1
 fi
 

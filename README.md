@@ -4,9 +4,8 @@
 <ol>
   <li><a href="#overview">Overview</a></li>
   <li><a href="#setup--usage">Setup &amp; Usage</a></li>
-  <li><a href="#components-and-their-network-roles">Components and Their Network Roles</a></li>
-  <li><a href="#network-flow">Network Flow</a></li>
-  <li><a href="#detailed-scriptconfig-reference">Detailed Script/Config Reference</a></li>
+  <li><a href="#directories-and-files">Directories and Files</a></li>
+  <li><a href="#network-setup">Network Setup</a></li>
   <li><a href="#references">References</a></li>
   <li><a href="#troubleshooting-guide">Troubleshooting Guide</a></li>
 </ol>
@@ -105,33 +104,45 @@ For detailed step-by-step instructions, see below.
      ./remove-latency.sh
      ```
 
-## Components and Their Network Roles
-
-**Understand the function of each part in the system.**
-
-*For detailed script explanations, see the [Detailed Script/Config Reference](#detailed-scriptconfig-reference) section.*
+## Directories and Files
 
 ### 1. **Robot Car (`/car`)**
-- **Video Streaming**: Captures video from the car’s camera and sends it over UDP to the controller.
-- **Control Server**: Receives movement commands from the controller. Uses a reverse SSH tunnel for NAT traversal.
-- **Environment Variables**: Set in `.env` (see Setup & Usage section).
-
+All car related files are in this directory.
+- `/car/control_server.py`
+  - Establishes a reverse SSH tunnel to the controller for NAT bypassing.
+  - Listens for TCP connections on the control port.
+  - Receives JSON commands and controls the car.
+    
+- `/car/run_control_server.sh`
+  - Runs the `controler_server.py` with appropriate env variables specified in `.env`.
+    
 ### 2. **Controller (`/controller`)**
-- **Video Reception**: Receives the UDP video stream. Optionally, processes the video using OpenCV.
-- **Control Client**: Connects to the car’s control server via the reverse SSH tunnel. Sends movement commands (WASD keys) over TCP.
+All controller related files are in this directory.
+
+- `/controller/show_video.sh`
+  - Receives and displays the video stream on the port specified by the first argument.
+
+- `/controller/control_client.py`
+  - Connects to the car’s control server.
+  - Sends movement commands to the reverse ssh tunnel port.
+  - Optionally processes video for obstacle detection.
+
 
 ### 3. **Testbed (`/testbed`)**
-- **Network Slicing and Emulation**: Used to simulate different network conditions.
+Directory to testbed related files and scripts.
+  
+- `/testbed/add-latency.sh` and `/testbed/remove-latency.sh`
+  - Add or remove artificial network latency for demo purposes. Specifically, latency is added/removed inside the UPF2 pod on the node where 5G core is hosted.
+
 
 ### 4. **Environment Examples (`/env_examples`)**
-- Provide sample `.env` files for different cars or scenarios. See Setup & Usage section for usage.
+Sample `.env` files for different cars or scenarios.
 
 
-## Network Flow
 
-This is a high-level view view of the network connections between the car and the controller. First, the car establishes an SSH connection to a publicly available server which acts as the client or the remote controller of the car. This is to bypass any NAT between the car to the controller. This is exactly the case for our labscale 5G testbed.
+## Network Setup
 
-The control commands are sent from the controller to the car over the SSH connection established. The video stream from the car is sent over UDP to the controller.
+This is a high-level view view of the network connections between the car and the controller. First, the car establishes an SSH connection to a publicly available server which acts as the remote controller of the car to setup reverse port forwarding. This is to bypass any NAT between the controller to the car which happens to be the case for 5G open source testbeds. This way, the control commands can be sent  controller's process to the local port `$CONTROLLER_CONTROL_PORT`. The commads then are forwarded to the local port where the car is listening to receive commands. The video stream from the car is sent over UDP to the controller to the port `$CONTROLLER_STREAMING_PORT`.
 
 ```
 +-------------------+         UDP (Video Stream)              +------------------+
@@ -140,56 +151,6 @@ The control commands are sent from the controller to the car over the SSH connec
 |                   | <-------- TCP (Control Commands) -------|                  |
 +-------------------+     (via the SSH Tunnel established)    +------------------+
 ```
-
-
-## Detailed Script/Config Reference
-
-**This is the only section with detailed script and configuration file explanations.**
-
-### `/car/.env` (see Setup & Usage)
-- Stores network configuration for the car.
-
-### `/car/run_camera_video_streamer.sh`
-- Loads `.env`, checks for `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT`.
-- Runs `./stream_video.sh "${CONTROLLER_IP}" "${CONTROLLER_STREAMING_PORT}"`.
-
-### `/car/stream_video.sh`
-- GStreamer pipeline:
-  ```bash
-  gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! ... ! udpsink host="$1" port="$2"
-  ```
-- Streams H.264 video over UDP to the controller.
-
-### `/car/run_control_server.sh`
-- Loads `.env`, checks for `CONTROLLER_IP` and `CONTROLLER_CONTROL_PORT`.
-- Runs `python3 control_server.py "${CONTROLLER_IP}" "${CONTROLLER_CONTROL_PORT}"`.
-
-### `/car/control_server.py`
-- Listens for TCP connections on the control port.
-- Receives JSON commands, controls the car.
-- Establishes a reverse SSH tunnel to the controller for NAT traversal.
-
-### `/controller/.env` (see Setup & Usage)
-- Stores network configuration for the controller.
-
-### `/controller/run_controller.sh`
-- Loads `.env`, checks for required ports.
-- Runs the controller Python script with the correct ports.
-
-### `/controller/show_video.sh`
-- GStreamer pipeline:
-  ```bash
-  gst-launch-1.0 -vv udpsrc port="${1}" ... ! autovideosink sync=false
-  ```
-- Receives and displays the video stream.
-
-### `/controller/control_client.py`
-- Connects to the car’s control server (via SSH tunnel).
-- Sends movement commands.
-- Optionally processes video for obstacle detection.
-
-### `/testbed/add-latency.sh` and `/testbed/remove-latency.sh`
-- Add or remove artificial network latency for test purposes.
 
 
 ## References
@@ -204,22 +165,11 @@ The control commands are sent from the controller to the car over the SSH connec
 
 This guide provides solutions to common issues you may encounter when setting up or running the networked robot car system.
 
-### 1. Environment File Issues
-- **Error:** `.env file does not exist.`
-  - **Solution:**
-    - See Setup & Usage above for how to copy and edit `.env` files.
-
-- **Error:** `CONTROLLER_IP`, `CONTROLLER_CONTROL_PORT`, or `CONTROLLER_STREAMING_PORT` not present in the environmental variables.
-  - **Solution:**
-    - See Setup & Usage above for how to edit `.env` files.
-
 ### 2. Video Streaming Problems
 - **Error:** `Unable to open video stream.` or no video window appears on the controller.
   - **Solution:**
     - Ensure the car is running `run_camera_video_streamer.sh` and the controller is running `show_video.sh` or the controller Python script.
     - Check that the `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT` match on both car and controller.
-    - Make sure the network allows UDP traffic on the streaming port.
-    - If using 5G, verify the car has a valid network connection (see 5G section).
 
 - **Video is choppy or delayed.**
   - **Solution:**

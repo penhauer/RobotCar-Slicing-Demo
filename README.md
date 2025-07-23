@@ -3,7 +3,7 @@
 
 <ol>
   <li><a href="#overview">Overview</a></li>
-  <li><a href="#network-setup>Network Setups</a></li>
+  <li><a href="#network-setup">Network Setup</a></li>
   <li><a href="#car-and-controller-setup">Car and Controller Setup</a></li>
   <li><a href="#directories-and-files">Directories and Files</a></li>
   <li><a href="#network-connections">Network Connections</a></li>

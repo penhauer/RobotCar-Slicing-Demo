@@ -232,9 +232,9 @@ This guide provides solutions to common issues you may encounter when setting up
 
 ### Video Streaming Problems
 - **Error:** `Unable to open video stream.` or no video window appears on the controller.
-  - **Solution:**
-    - Ensure the car is running `run_camera_video_streamer.sh` and the controller is running `show_video.sh` or the controller Python script.
-    - Check that the `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT` match on both car and controller.
+- **Solution:**
+  - Ensure the car is running `run_camera_video_streamer.sh` and the controller is running `show_video.sh` or the controller Python script.
+  - Check that the `CONTROLLER_IP` and `CONTROLLER_STREAMING_PORT` match on both car and controller.
 
 - **Video is choppy or delayed.**
   - **Solution:**

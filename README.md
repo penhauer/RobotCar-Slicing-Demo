@@ -3,9 +3,10 @@
 
 <ol>
   <li><a href="#overview">Overview</a></li>
-  <li><a href="#setup--usage">Setup &amp; Usage</a></li>
+  <li><a href="#network-setup>Network Setups</a></li>
+  <li><a href="#car-and-controller-setup">Car and Controller Setup</a></li>
   <li><a href="#directories-and-files">Directories and Files</a></li>
-  <li><a href="#network-setup">Network Setup</a></li>
+  <li><a href="#network-connections">Network Connections</a></li>
   <li><a href="#references">References</a></li>
   <li><a href="#troubleshooting-guide">Troubleshooting Guide</a></li>
 </ol>
@@ -24,7 +25,58 @@ The video is streamed to an edge server where controlling commands are sent back
 
 ---
 
-## Setup & Usage
+## Network Setup
+The cars come with both a Wi-Fi card and a 5G module. Either can be used for internet connectivity. If the you managed to connect the cars to internet or a local network, you can skip this section.
+
+
+
+#### Connecting to 4G/5G testbed
+
+
+The instructions on how to setup the 5G module can be found [here](https://www.waveshare.com/wiki/SIM8200EA-M2_5G_for_Jetson_Nano#Document). For the 5G module to operate, its driver should be installed on the car. Taken from the documentation:
+
+```bash
+$ sudo apt-get install p7zip-full
+$ wget https://files.waveshare.com/upload/0/07/Sim8200_for_jetsonnano.7z
+$ 7z x Sim8200_for_jetsonnano.7z -r -o./Sim8200_for_jetsonnano
+$ sudo chmod 777 -R Sim8200_for_jetsonnano
+$ cd Sim8200_for_jetsonnano
+$ sudo ./install.sh
+
+$ cd Goonline
+$ make
+
+# Now finnally try connecting to the testbed.
+$ sudo ./simcom-cm
+```
+
+Before the last step, make sure the 5G module's LED is blinking green, indicating the module's ready to connect. Note that the module has a red LED, which indicates the module is powered. Also, the 5G module has a white reset button that helps resetting the state when problems occur in connection. 
+
+Once the module is connected, the interface wwan0 should be created and should get an ip address internal to the RAN. If you send traffic through this interface, it will go through the RAN and testbed.
+
+```bash
+$ ping -I wwan0 8.8.8.8
+```
+
+Alternatively, you can add a default route so all 
+traffic is sent from `wwan0`. This might done by default using the script but there might be other default paths like `wlan0` for Wi-Fi or eth0. Make sure the default traffic passes through the radio interface established between module and the testbed.
+
+Check the routing table to make sure the default path is through `wwan0`.
+
+```
+$ ip route
+```
+
+#### Connecting to Wi-Fi
+
+To connect to Wi-Fi, simply run:
+
+```
+$ sudo nmtui
+```
+
+
+## Car and Controller Setup
 
 ### High-Level Steps
 
@@ -140,7 +192,7 @@ Sample `.env` files for different cars or scenarios.
 
 
 
-## Network Setup
+## Network Connections
 
 This is a high-level view view of the network connections between the car and the controller. First, the car establishes an SSH connection to a publicly available server which acts as the remote controller of the car to setup reverse port forwarding. This is to bypass any NAT between the controller to the car which happens to be the case for 5G open source testbeds. This way, the control commands can be sent  controller's process to the local port `$CONTROLLER_CONTROL_PORT`. The commads then are forwarded to the local port where the car is listening to receive commands. The video stream from the car is sent over UDP to the controller to the port `$CONTROLLER_STREAMING_PORT`.
 
@@ -165,7 +217,20 @@ This is a high-level view view of the network connections between the car and th
 
 This guide provides solutions to common issues you may encounter when setting up or running the networked robot car system.
 
-### 2. Video Streaming Problems
+### 5G Connection Problems
+
+- 5G module does not blink green.
+  - **Solution:**
+    - Follow the instructions in the video below.
+
+
+- 5G module does not connect.
+  - **Solution:**
+    - Ensure the sim card is present in the 5G moduel's sim slot. 
+    - Make sure green LED of the 5G module should be blinking or on.
+    - Reset the module and try connecting again
+
+### Video Streaming Problems
 - **Error:** `Unable to open video stream.` or no video window appears on the controller.
   - **Solution:**
     - Ensure the car is running `run_camera_video_streamer.sh` and the controller is running `show_video.sh` or the controller Python script.

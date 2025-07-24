@@ -105,11 +105,14 @@ For detailed step-by-step instructions, see below.
    - On the robot car, install required Python dependencies:
      ```bash
      cd car
-     python3 -m venv venv
+
+     python3 -m venv --system-site-packages venv # include the system site packages to import the `jetracer` module
+
+     python3 -m venv venv 
      source venv/bin/activate
      pip3 install -r requirements.txt
      ```
-   - **You must also install the `jetracer` package from NVIDIA for the control server to work.**
+   - **You must have the `jetracer` package from NVIDIA installed before creating python virtual env for the control server to work.**
      - If not already installed, follow the instructions here: https://www.waveshare.com/wiki/JetRacer_Pro_AI_Kit
    - (Optional) Adjust power and WiFi settings for optimal performance:
      ```bash

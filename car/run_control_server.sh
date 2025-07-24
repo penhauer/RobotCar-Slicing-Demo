@@ -19,5 +19,5 @@ if [ -z "${CONTROLLER_CONTROL_PORT}" ]; then
 	exit 1
 fi
 
-python3 control_server.py "${SERVER_IP}" "${SERVER_CONTROL_PORT}" "${SERVER_PASSWORD}"
+python3 control_server.py "${CONTROLLER_IP}" "${CONTROLLER_CONTROL_PORT}" "${CONTROLLER_PASSWORD}"
 

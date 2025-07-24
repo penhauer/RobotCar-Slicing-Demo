@@ -107,8 +107,6 @@ For detailed step-by-step instructions, see below.
      cd car
 
      python3 -m venv --system-site-packages venv # include the system site packages to import the `jetracer` module
-
-     python3 -m venv venv 
      source venv/bin/activate
      pip3 install -r requirements.txt
      ```

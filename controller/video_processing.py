@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import os
-
+import io
+import av  # NEW: PyAV (FFmpeg) backend for capture
 
 os.sched_setaffinity(0, {0, 1, 2, 3})
 
@@ -61,56 +62,80 @@ def compute_average_hsv(frame):
 
 
 def capture_thread(port: str):
-    gst_pipeline = (
-        f"udpsrc port={port} caps=application/x-rtp,payload=96 ! "
-        "rtpjitterbuffer latency=100 ! rtph264depay ! queue ! avdec_h264 ! "
-        "videoconvert ! queue ! appsink"
+    """
+    Receive RTP/H264 on UDP `port` via FFmpeg (PyAV), decode to BGR, and run the original logic.
+    No OpenCV+GStreamer or gi required.
+    """
+    # Minimal SDP describing an H264 RTP stream on the given port (PT=96)
+    sdp = f"""v=0
+o=- 0 0 IN IP4 0.0.0.0
+s=stream
+c=IN IP4 0.0.0.0
+t=0 0
+m=video {port} RTP/AVP 96
+a=rtpmap:96 H264/90000
+a=recvonly
+"""
+
+    # Open via PyAV using the SDP in-memory. Allow UDP/RTP from FFmpeg.
+    # fifo_size/overrun_nonfatal help with bursts; ffflags/flags reduce latency.
+    container = av.open(
+        io.BytesIO(sdp.encode("utf-8")),
+        format="sdp",
+        options={
+            "protocol_whitelist": "file,udp,rtp",
+            "fifo_size": "1000000",
+            "overrun_nonfatal": "1",
+            "fflags": "nobuffer",
+            "flags": "low_delay",
+        },
     )
-    cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
-    if not cap.isOpened():
-        print("Error: Unable to open video stream.")
+
+    # Get the first video stream
+    if not container.streams.video:
+        print("Error: No video stream found in SDP/port.")
+        container.close()
         return
+    vstream = container.streams.video[0]
+    vstream.thread_type = "AUTO"
 
-    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to capture frame. Exiting...")
-            break
+    try:
+        for packet in container.demux(vstream):
+            # Packets may contain multiple frames
+            for frame in packet.decode():
+                # Convert to numpy BGR (like cv2 expects)
+                bgr = frame.to_ndarray(format="bgr24")
 
-        cv2.imshow("Original Frame", frame)
-        print("hererer", command_dict)
+                # --- Original logic preserved ---
+                cv2.imshow("Original Frame", bgr)
+                print("hererer", command_dict)
 
-        if command_dict:
-            processed_frame, obstacle_detected = filter_red(frame)
-            # Overlay text based on `obstacle_detected` value
-            if obstacle_detected:
-                text = "Obstacle Detected!"
-                color = (0, 0, 255)  # Red text for detection
-            else:
-                text = "No Obstacle"
-                color = (0, 255, 0)  # Green text for no detection
+                if command_dict:
+                    processed_frame, obstacle_detected = filter_red(bgr)
 
-            # Add text to the frame
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 1
-            thickness = 2
-            line_type = cv2.LINE_AA
+                    if obstacle_detected:
+                        text = "Obstacle Detected!"
+                        color = (0, 0, 255)
+                    else:
+                        text = "No Obstacle"
+                        color = (0, 255, 0)
 
-            # Position of the text (top-left corner)
-            text_position = (10, 30)  # (x, y)
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 1
+                    thickness = 2
+                    line_type = cv2.LINE_AA
+                    text_position = (10, 30)
 
-            cv2.putText(processed_frame, text, text_position, font, font_scale, color, thickness, line_type)
+                    cv2.putText(processed_frame, text, text_position, font, font_scale, color, thickness, line_type)
+                    cv2.imshow("Processed Frame", processed_frame)
 
-            # Show the processed frame
-            cv2.imshow("Processed Frame", processed_frame)
+                    command_dict["obstacle"] = obstacle_detected
 
-            # Update the command dictionary
-            command_dict["obstacle"] = obstacle_detected
-
-
-        cv2.waitKey(1)
-
-    cap.release()
-    cv2.destroyAllWindows()
-
+                # UI / exit
+                if cv2.waitKey(1) == 27:  # ESC
+                    raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        pass
+    finally:
+        container.close()
+        cv2.destroyAllWindows()

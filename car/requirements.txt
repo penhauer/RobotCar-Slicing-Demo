@@ -1,2 +1,4 @@
 websocket-client
 python-dotenv
+adafruit-circuitpython-vl53l0x
+

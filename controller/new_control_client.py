@@ -142,7 +142,7 @@ class ClientSocket:
             distance_cm = distance_mm / 10.0
             status_parts.append(f"Distance: {distance_mm}mm ({distance_cm:.1f}cm)")
             
-        print(f"[Health] {' | '.join(status_parts)}")
+        # print(f"[Health] {' | '.join(status_parts)}")
 
 
 
@@ -208,20 +208,20 @@ class KeyboardController(traitlets.HasTraits):
         traitlets.dlink((self, 'throttle'), (self, 'change'), transform=self._update_throttle)
 
     def _update_steering(self, value):
-        c = self.change.copy()
-        c['steering'] = value
-        c['type'] = 'steering'
-        return c
+        return {
+            'steering': value,
+            'type': 'steering'
+        }
 
     def _update_throttle(self, value):
-        c = self.change.copy()
-        c['throttle'] = value
-        c['type'] = 'throttle'
-        return c
+        return {
+            'throttle': value,
+            'type': 'throttle'
+        }
 
     @traitlets.observe('change')
     def _on_change(self, d):
-        msg = {'new': d['new']}
+        msg = d['new']
         try:
             self.client_socket.send_twice(msg)
         except Exception as e:

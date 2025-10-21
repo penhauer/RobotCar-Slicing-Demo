@@ -64,20 +64,21 @@ def start_distance_sensor():
 # ---------------- Control handling ----------------
 def control_the_car(d: dict):
     """
-    Expected payload lines from server (newline-delimited JSON), e.g.:
-      {"new":{"steering":1,"type":"steering"}}
-      {"new":{"throttle":-1,"type":"throttle"}}
+    Expected payload from server (newline-delimited JSON), e.g.:
+      {"steering": 1, "type": "steering"}
+      {"throttle": -1, "type": "throttle"}
     """
+    print(d)
     if car is None:
         print("Warning: message received but car is not set")
         return
 
     try:
-        t = d["new"]["type"]
+        t = d.get("type")
         if t == "steering":
-            _on_steering(d["new"])
+            _on_steering(d)
         elif t == "throttle":
-            _on_throttle(d["new"])
+            _on_throttle(d)
         else:
             print(f"Unknown command type '{t}'")
     except Exception as e:
@@ -85,20 +86,20 @@ def control_the_car(d: dict):
         traceback.print_exc()
 
 
-def _on_steering(new_obj: dict):
+def _on_steering(cmd: dict):
     if hasattr(car, "_on_steering") and callable(car._on_steering):
-        car._on_steering(new_obj)
+        car._on_steering(cmd)
         return
-    steering = int(new_obj.get("steering", 0))
+    steering = int(cmd.get("steering", 0))
     car.steering = steering
     print(f"[car] steering <- {car.steering}")
 
 
-def _on_throttle(new_obj: dict):
+def _on_throttle(cmd: dict):
     if hasattr(car, "_on_throttle") and callable(car._on_throttle):
-        car._on_throttle(new_obj)
+        car._on_throttle(cmd)
         return
-    throttle = int(new_obj.get("throttle", 0))
+    throttle = int(cmd.get("throttle", 0))
     car.throttle = throttle
     print(f"[car] throttle <- {car.throttle}")
 

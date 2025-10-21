@@ -17,7 +17,7 @@ WS_SERVER_PORT = int(os.getenv("WS_SERVER_PORT", "8765"))
 WS_SCHEME = os.getenv("WS_SCHEME", "ws")
 THROTTLE_GAIN = float(os.getenv("THROTTLE_GAIN", "0.2"))
 STEERING_OFFSET = float(os.getenv("STEERING_OFFSET", "0.3"))
-HEALTH_INTERVAL = float(os.getenv("HEALTH_INTERVAL", "2.0"))
+STATUS_INTERVAL = float(os.getenv("STATUS_INTERVAL", "2.0"))
 ENABLE_DISTANCE_SENSOR = os.getenv("ENABLE_DISTANCE_SENSOR", "false").lower() == "true"
 
 # ---------------- Car setup ----------------
@@ -90,10 +90,10 @@ def control_the_car(d: dict):
 
 # ---------------- WebSocket client ----------------
 class WSClient:
-    def __init__(self, url: str, health_interval_s: float = 2.0):
+    def __init__(self, url: str, status_interval_s: float = 2.0):
         self.url = url
         self.wsapp: Optional[websocket.WebSocketApp] = None
-        self._health_interval_s = health_interval_s
+        self._status_interval_s = status_interval_s
         self._start_ts = time.time()
         self._stop = threading.Event()
         self._connected = threading.Event()
@@ -169,7 +169,7 @@ class WSClient:
                         distance_mm = dist
                 
                 payload = {
-                    "type": "health",
+                    "type": "status",
                     "ts_ms": int(time.time() * 1000),
                     "uptime_s": round(time.time() - self._start_ts, 3),
                     "car_ready": _car_ready.is_set(),
@@ -179,7 +179,7 @@ class WSClient:
                     self.wsapp.send(json.dumps(payload) + "\n")
                 except Exception:
                     pass
-            time.sleep(self._health_interval_s)
+            time.sleep(self._status_interval_s)
 
 
 # ---------------- Main ----------------
@@ -196,7 +196,7 @@ def main():
     threading.Thread(target=start_distance_sensor, daemon=True).start()
 
     # Start WebSocket client
-    client = WSClient(url, health_interval_s=HEALTH_INTERVAL)
+    client = WSClient(url, status_interval_s=STATUS_INTERVAL)
     client.start()
 
     try:

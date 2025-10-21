@@ -121,8 +121,8 @@ class ClientSocket:
                     continue
                 data = json.loads(line)
                 msg_type = data.get("type")
-                if msg_type == "health":
-                    self._handle_health_message(data)
+                if msg_type == "status":
+                    self._handle_status_message(data)
                 else:
                     print(f"[WS] Received message: {data}")
         except json.JSONDecodeError as e:
@@ -130,8 +130,8 @@ class ClientSocket:
         except Exception as e:
             print(f"[WS] Error handling message: {e}")
 
-    def _handle_health_message(self, data: dict):
-        """Process and display health/status information from the car."""
+    def _handle_status_message(self, data: dict):
+        """Process and display status information from the car."""
         uptime = data.get("uptime_s", 0)
         car_ready = data.get("car_ready", False)
         distance_mm = data.get("distance_mm", "")
@@ -142,7 +142,8 @@ class ClientSocket:
             distance_cm = distance_mm / 10.0
             status_parts.append(f"Distance: {distance_mm}mm ({distance_cm:.1f}cm)")
             
-        # print(f"[Health] {' | '.join(status_parts)}")
+        print(f"[Status] {' | '.join(status_parts)}")
+        print("\n\n")
 
 
 

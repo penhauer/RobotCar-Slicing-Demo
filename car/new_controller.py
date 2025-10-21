@@ -52,7 +52,7 @@ def start_distance_sensor():
         return
         
     try:
-        from car.distance_sensor import DistanceSensor
+        from distance_sensor import DistanceSensor
         distance_sensor = DistanceSensor()
         distance_sensor.start()
         print("Distance sensor initialized")

@@ -1,5 +1,9 @@
+# traitlets
+# keyboard
+# numpy
+# opencv-python
+# av
+
+python-dotenv
+websocket-server
 traitlets
-keyboard
-numpy
-opencv-python
-av

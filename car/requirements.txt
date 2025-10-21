@@ -1,2 +1,1 @@
-twisted
-traitlets
+websocket-client

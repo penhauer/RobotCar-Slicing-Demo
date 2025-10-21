@@ -7,4 +7,4 @@ ADD requirements.txt .
 RUN pip3 install -r requirements.txt
 ADD . .
 
-CMD ["python3", "new_control_client.py"]
+CMD ["python3", "controller.py"]

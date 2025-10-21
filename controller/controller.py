@@ -10,19 +10,11 @@ import time
 import tty
 import termios
 import select
-import os
-import sys
-import tty
-import termios
-import select
-import threading
-import time
-import traitlets
-import subprocess
+import collections
+import re
+import shutil
 
-# from video_processing import capture_thread, command_dict
 
-import traitlets
 from websocket_server import WebsocketServer
 from dotenv import load_dotenv  # pip install python-dotenv
 
@@ -38,11 +30,13 @@ WS_HOST = os.getenv("WS_HOST", "0.0.0.0")
 WS_CONTROL_PORT = int(os.getenv("WS_CONTROL_PORT", "8765"))
 STREAMING_PORT = int(os.getenv("STREAMING_PORT", "8554"))
 PROCESS_VIDEO = os.getenv("PROCESS_VIDEO", "false").lower() == "true"
+PROCESS_DISTANCE = os.getenv("PROCESS_DISTANCE", "false").lower() == "true"
 
 
 # ==============================
 # Non-async WebSocket "push" server
 # ==============================
+
 class ClientSocket:
     def __init__(self, server_ip: str, server_port: int) -> None:
         host = server_ip
@@ -57,6 +51,8 @@ class ClientSocket:
 
         self._thread = threading.Thread(target=self.server.run_forever, daemon=True)
         self._thread.start()
+
+        self.distance_handler = None 
 
         pretty_host = self._pretty_host(host)
         print(f"[WS] Listening on ws://{pretty_host}:{port}")
@@ -81,17 +77,6 @@ class ClientSocket:
                 raise RuntimeError("No WebSocket client connected")
             client = self._client
         self.server.send_message(client, payload)
-
-    def send_twice(self, msg):
-        try:
-            self.send(msg)
-        except Exception as e:
-            print("Send failed. Will retry once.", e)
-            time.sleep(0.1)
-            try:
-                self.send(msg)
-            except Exception as e2:
-                print("Second send failed; dropping message.", e2)
 
     def close(self):
         try:
@@ -141,28 +126,88 @@ class ClientSocket:
         if distance_mm != "":
             distance_cm = distance_mm / 10.0
             status_parts.append(f"Distance: {distance_mm}mm ({distance_cm:.1f}cm)")
+            if not self.distance_handler is None:
+                self.distance_handler.handle_distance_report(distance_cm)
             
         print(f"[Status] {' | '.join(status_parts)}")
         print("\n\n")
 
 
+    def register_distance_report_handler(self, distance_handler):
+        self.distance_handler = distance_handler
 
 
 
 # ==============================
 # Keyboard controller
 # ==============================
-import os, re, sys, time, select, subprocess, shutil, threading, subprocess, termios, tty
-import traitlets
+class Controller:
+    def __init__(self, client_socket: ClientSocket):
+        self.client_socket = client_socket
+        self.steering = 0
+        self.throttle = 0
+        self.auto_mode = False
+        self._lock = threading.Lock()
+        
+    def set_steering(self, value):
+        """Update steering value and send to websocket."""
+        with self._lock:
+            if self.steering != value:
+                self.steering = value
+                self._send_control('steering', value)
+    
+    def set_throttle(self, value):
+        """Update throttle value and send to websocket."""
+        with self._lock:
+            if self.throttle != value:
+                self.throttle = value
+                self._send_control('throttle', value)
+    
+    def set_auto_mode(self, enabled):
+        """Enable or disable auto mode."""
+        with self._lock:
+            self.auto_mode = enabled
+            if enabled:
+                self.set_throttle(1)
+            else:
+                self.set_throttle(0)
+    
+    def update_axes(self, steering, throttle):
+        """Update both steering and throttle atomically."""
+        with self._lock:
+            changed = False
+            if self.steering != steering:
+                self.steering = steering
+                self._send_control('steering', steering)
+                changed = True
+            if self.throttle != throttle:
+                self.throttle = throttle
+                self._send_control('throttle', throttle)
+                changed = True
+    
+    def _send_control(self, control_type, value):
+        """Internal method to send control message to websocket."""
+        msg = {
+            'type': control_type,
+            control_type: value
+        }
+        try:
+            self.client_socket.send(msg)
+        except Exception as e:
+            print(f"Send failed with error: {e}")
+    
+    def stop(self):
+        """Stop all movement."""
+        self.update_axes(0, 0)
 
-class KeyboardController(traitlets.HasTraits):
-    steering = traitlets.Int()
-    throttle = traitlets.Int()
-    change = traitlets.Dict()
 
+class KeyboardController:
+    """Keyboard input handler that reports key events to Controller."""
+    
     # --- helpers (nested) ---
     class _KeyState:
-        def __init__(self): self.down = set()
+        def __init__(self): 
+            self.down = set()
         def set_down(self, k): self.down.add(k)
         def set_up(self, k): self.down.discard(k)
         def is_down(self, k): return k in self.down
@@ -191,51 +236,19 @@ class KeyboardController(traitlets.HasTraits):
     _MAKE_RE  = re.compile(r"^0x([0-9a-f]+)\+\s*$", re.I)
     _BREAK_RE = re.compile(r"^0x([0-9a-f]+)-\s*$", re.I)
 
-    @traitlets.validate('change')
-    def _clip_change(self, proposal):
-        return proposal['value']
-
-    def __init__(self, client_socket):
-        self.client_socket = client_socket
-        self.setup_trait_links()
-
+    def __init__(self, controller: Controller):
+        self.controller = controller
         self.keyboard_thread = threading.Thread(target=self.keyboard_listener)
         self.keyboard_thread.daemon = True
         self.keyboard_thread.start()
 
-    # --- trait plumbing ---
-    def setup_trait_links(self):
-        traitlets.dlink((self, 'steering'), (self, 'change'), transform=self._update_steering)
-        traitlets.dlink((self, 'throttle'), (self, 'change'), transform=self._update_throttle)
-
-    def _update_steering(self, value):
-        return {
-            'steering': value,
-            'type': 'steering'
-        }
-
-    def _update_throttle(self, value):
-        return {
-            'throttle': value,
-            'type': 'throttle'
-        }
-
-    @traitlets.observe('change')
-    def _on_change(self, d):
-        msg = d['new']
-        try:
-            self.client_socket.send_twice(msg)
-        except Exception as e:
-            print("Send failed with error.")
-            print(e)
-
     # --- public entry ---
     def keyboard_listener(self):
         # prefer kbd/showkey; fallback to raw stdin
-        if self._usable_showkey() and self._on_real_vt():
-            self._keyboard_listener_kbd()
-        else:
-            self._keyboard_listener_stdin()
+        # if self._usable_showkey() and self._on_real_vt():
+        #     self._keyboard_listener_kbd()
+        # else:
+        self._keyboard_listener_stdin()
 
     # --- impl: KBD/showkey path ---
     def _keyboard_listener_kbd(self):
@@ -273,9 +286,11 @@ class KeyboardController(traitlets.HasTraits):
                             continue
                         if line.endswith('+'):
                             ks.set_down(key)
-                            if key == 'm': auto = True
+                            if key == 'm': 
+                                auto = True
+                                self.controller.set_auto_mode(True)
                             if key == 'q':
-                                self._apply_axes(0, 0)
+                                self.controller.stop()
                                 proc.terminate()
                                 proc.wait(timeout=1)
                                 return
@@ -285,6 +300,7 @@ class KeyboardController(traitlets.HasTraits):
                 # auto cancels if manual input occurs
                 if auto and any(ks.is_down(k) for k in ('w','a','s','d','q')):
                     auto = False
+                    self.controller.set_auto_mode(False)
 
                 # periodic send
                 now = time.monotonic()
@@ -295,7 +311,7 @@ class KeyboardController(traitlets.HasTraits):
                     if ks.is_down('w') and ks.is_down('s'): t = 0
                     if ks.is_down('a') and ks.is_down('d'): s = 0
                     if auto: t = 1
-                    self._apply_axes(s, t)
+                    self.controller.update_axes(s, t)
 
                 if proc.poll() is not None:
                     break
@@ -306,7 +322,7 @@ class KeyboardController(traitlets.HasTraits):
                     try: proc.wait(timeout=1)
                     except subprocess.TimeoutExpired: proc.kill()
             finally:
-                self._apply_axes(0, 0)
+                self.controller.stop()
                 print("[kbd] Listener exit.")
 
     # --- impl: raw-stdin fallback ---
@@ -316,7 +332,7 @@ class KeyboardController(traitlets.HasTraits):
         auto = False
         RELEASE_MS = 120
         POLL = 0.01
-        SEND = 0.05
+        SEND = 0.02
         last_send = 0.0
 
         def sweep():
@@ -328,6 +344,7 @@ class KeyboardController(traitlets.HasTraits):
         try:
             with self._RawTTY():
                 while True:
+                    print("fucking here")
                     r, _, _ = select.select([sys.stdin], [], [], POLL)
                     if r:
                         data = sys.stdin.buffer.read1(1024) if hasattr(sys.stdin, "buffer") else sys.stdin.read(1)
@@ -339,35 +356,40 @@ class KeyboardController(traitlets.HasTraits):
                         for b in data:
                             c = chr(b).lower()
                             if c in ('w','a','s','d','m','q'):
-                                pressed.add(c); last_seen[c] = now_ms
-                                if c == 'm': auto = True
+                                pressed.add(c)
+                                last_seen[c] = now_ms
+                                if c == 'm': 
+                                    auto = True
+                                    self.controller.set_auto_mode(True)
                                 if c == 'q':
-                                    self._apply_axes(0, 0)
+                                    self.controller.stop()
                                     return
                     sweep()
 
                     if auto and any(k in pressed for k in ('w','a','s','d','q')):
                         auto = False
+                        self.controller.set_auto_mode(False)
 
                     t = 1 if 'w' in pressed else (-1 if 's' in pressed else 0)
                     s = -1 if 'a' in pressed else (1 if 'd' in pressed else 0)
-                    if 'w' in pressed and 's' in pressed: t = 0
-                    if 'a' in pressed and 'd' in pressed: s = 0
-                    if auto: t = 1
+                    if 'w' in pressed and 's' in pressed: 
+                        t = 0
+                    if 'a' in pressed and 'd' in pressed: 
+                        s = 0
+                    if auto: 
+                        t = 1
 
                     now = time.monotonic()
                     if (now - last_send) >= SEND:
+                        print("calling update axes")
                         last_send = now
-                        self._apply_axes(s, t)
+                        self.controller.update_axes(s, t)
         finally:
-            self._apply_axes(0, 0)
+            print("*" * 1000)
+            self.controller.stop()
             print("[stdin] Listener exit.")
 
     # --- utilities ---
-    def _apply_axes(self, s, t):
-        self.steering = s
-        self.throttle = t
-
     def _usable_showkey(self):
         return shutil.which("showkey") is not None
 
@@ -380,8 +402,29 @@ class KeyboardController(traitlets.HasTraits):
 
 
 
+class DistanceController:
+    def __init__(self, controller: Controller):
+        # self.distances = collections.deque()
+        # self.span =
+        # pass
+        self.threshold = 40 # 40cm
+        self.controller = controller
 
 
+    def pop(self):
+        pass
+        # time.monotonic()
+        # while True and len(self.distances) >= 1:
+        #     d = self.distances[0]
+        #     if d[0]
+
+    def handle_distance_report(self, distance_cm: int):
+        # self.distances.append(distance_cm)
+        if distance_cm < self.threshold:
+            self.stop_auto_move()
+    
+    def stop_auto_move(self):
+        self.controller.set_auto_mode(False)
 
 
 
@@ -393,7 +436,10 @@ if __name__ == "__main__":
     print(f"Streaming port: {STREAMING_PORT} | Process Video: {PROCESS_VIDEO}")
 
     client_socket = ClientSocket(server_ip=WS_HOST, server_port=WS_CONTROL_PORT)
-    client = KeyboardController(client_socket)
+    controller = Controller(client_socket)
+    dc = DistanceController(controller)
+    client_socket.register_distance_report_handler(dc)
+    client = KeyboardController(controller)
 
     try:
         while True:

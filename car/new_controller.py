@@ -79,7 +79,7 @@ def control_the_car(d: dict):
             d["new"] = d["steering"]
             car._on_steering(d)
         elif t == "throttle":
-            d["new"] = d["steering"]
+            d["new"] = d["throttle"]
             car. _on_throttle(d)
         else:
             raise Exception(f"Unknown command type '{t}'")

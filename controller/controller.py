@@ -22,6 +22,7 @@ STREAMING_PORT = int(os.getenv("STREAMING_PORT", "8554"))
 PROCESS_VIDEO = os.getenv("PROCESS_VIDEO", "false").lower() == "true"
 PROCESS_DISTANCE = os.getenv("PROCESS_DISTANCE", "false").lower() == "true"
 DISTANCE_THRESHOLD = int(os.getenv("DISTANCE_THRESHOLD", "30"))
+MOVE_SPEED = float(os.getenv("MOVE_SPEED", "1.0"))
 
 
 # ==============================
@@ -234,7 +235,7 @@ Use W/A/S/D for control, M for auto-forward, Q to quit.
 
                     if keyboard.is_pressed('m'):
                         last_pressed = time.monotonic()
-                        t = 0.9
+                        t = MOVE_SPEED
                         auto = True
                         self.controller.set_auto_mode(True)
 

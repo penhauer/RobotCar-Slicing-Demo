@@ -1,25 +1,14 @@
 #!/usr/bin/env python3
 import json
-import keyboard  # ensure `pip install keyboard` and run with proper permissions on Linux
+import keyboard
 import logging
 import os
 import socket
-import subprocess
-import sys
 import threading
 import time
-import tty
-import termios
-import select
-import collections
-import re
-import shutil
-
-
 from websocket_server import WebsocketServer
-from dotenv import load_dotenv  # pip install python-dotenv
+from dotenv import load_dotenv
 
-# from video_processing import capture_thread, command_dict
 
 
 # ==============================
@@ -32,6 +21,7 @@ WS_CONTROL_PORT = int(os.getenv("WS_CONTROL_PORT", "8765"))
 STREAMING_PORT = int(os.getenv("STREAMING_PORT", "8554"))
 PROCESS_VIDEO = os.getenv("PROCESS_VIDEO", "false").lower() == "true"
 PROCESS_DISTANCE = os.getenv("PROCESS_DISTANCE", "false").lower() == "true"
+DISTANCE_THRESHOLD = int(os.getenv("DISTANCE_THRESHOLD", "30"))
 
 
 # ==============================
@@ -281,28 +271,16 @@ Use W/A/S/D for control, M for auto-forward, Q to quit.
 
 class DistanceController:
     def __init__(self, controller: Controller):
-        # self.distances = collections.deque()
-        # self.span =
-        # pass
-        self.threshold = 65 # 40cm
         self.controller = controller
 
-
-    def pop(self):
-        pass
-        # time.monotonic()
-        # while True and len(self.distances) >= 1:
-        #     d = self.distances[0]
-        #     if d[0]
-
     def handle_distance_report(self, distance_cm: int):
+        if not PROCESS_DISTANCE:
+            return
         print("Received distance ", distance_cm, self.threshold, PROCESS_DISTANCE, controller.auto_mode)
-        # self.distances.append(distance_cm)
-        if distance_cm < self.threshold and PROCESS_DISTANCE and controller.auto_mode:
+        if distance_cm < DISTANCE_THRESHOLD and controller.auto_mode:
             self.stop_auto_move()
     
     def stop_auto_move(self):
-        print("disabling")
         self.controller.set_auto_mode(False)
 
 

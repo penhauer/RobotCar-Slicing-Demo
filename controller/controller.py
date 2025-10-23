@@ -276,7 +276,7 @@ class DistanceController:
     def handle_distance_report(self, distance_cm: int):
         if not PROCESS_DISTANCE:
             return
-        print("Received distance ", distance_cm, self.threshold, PROCESS_DISTANCE, controller.auto_mode)
+        print("Received distance ", distance_cm, PROCESS_DISTANCE, controller.auto_mode)
         if distance_cm < DISTANCE_THRESHOLD and controller.auto_mode:
             self.stop_auto_move()
     

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import keyboard  # ensure `pip install keyboard` and run with proper permissions on Linux
 import logging
 import os
 import socket
@@ -74,9 +75,15 @@ class ClientSocket:
         payload = json.dumps(msg) + "\n"
         with self._clients_lock:
             if not self._client:
-                raise RuntimeError("No WebSocket client connected")
+                # No client connected, ignore message
+                return
             client = self._client
-        self.server.send_message(client, payload)
+        
+        try:
+            self.server.send_message(client, payload)
+        except Exception:
+            # Send failed, ignore message
+            pass
 
     def close(self):
         try:
@@ -149,52 +156,36 @@ class Controller:
         self.auto_mode = False
         self._lock = threading.Lock()
         
-    def set_steering(self, value):
-        """Update steering value and send to websocket."""
-        with self._lock:
-            if self.steering != value:
-                self.steering = value
-                self._send_control('steering', value)
-    
-    def set_throttle(self, value):
-        """Update throttle value and send to websocket."""
-        with self._lock:
-            if self.throttle != value:
-                self.throttle = value
-                self._send_control('throttle', value)
-    
     def set_auto_mode(self, enabled):
         """Enable or disable auto mode."""
         with self._lock:
             self.auto_mode = enabled
             if enabled:
-                self.set_throttle(1)
+                print("enabled")
+                self.throttle = 1
+                self._send_control('throttle', 1)
             else:
-                self.set_throttle(0)
+                print("disabled")
+                self.throttle = 0
+                self._send_control('throttle', 0)
     
     def update_axes(self, steering, throttle):
         """Update both steering and throttle atomically."""
         with self._lock:
-            changed = False
             if self.steering != steering:
                 self.steering = steering
                 self._send_control('steering', steering)
-                changed = True
             if self.throttle != throttle:
                 self.throttle = throttle
                 self._send_control('throttle', throttle)
-                changed = True
     
     def _send_control(self, control_type, value):
-        """Internal method to send control message to websocket."""
+        """Send control message, ignore if send fails."""
         msg = {
             'type': control_type,
             control_type: value
         }
-        try:
-            self.client_socket.send(msg)
-        except Exception as e:
-            print(f"Send failed with error: {e}")
+        self.client_socket.send(msg)
     
     def stop(self):
         """Stop all movement."""
@@ -202,204 +193,90 @@ class Controller:
 
 
 class KeyboardController:
-    """Keyboard input handler that reports key events to Controller."""
-    
-    # --- helpers (nested) ---
-    class _KeyState:
-        def __init__(self): 
-            self.down = set()
-        def set_down(self, k): self.down.add(k)
-        def set_up(self, k): self.down.discard(k)
-        def is_down(self, k): return k in self.down
-
-    class _RawTTY:
-        def __enter__(self):
-            self.is_tty = sys.stdin.isatty()
-            if self.is_tty:
-                self.fd = sys.stdin.fileno()
-                self.old = termios.tcgetattr(self.fd)
-                tty.setraw(self.fd)
-            return self
-        def __exit__(self, *a):
-            if getattr(self, 'is_tty', False):
-                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
-
-    # scancodes -> keys (Linux set 1; adjust if needed)
-    _SC_TO_KEY = {
-        0x11: 'w',  # W
-        0x1E: 'a',  # A
-        0x1F: 's',  # S
-        0x20: 'd',  # D
-        0x32: 'm',  # M
-        0x10: 'q',  # Q
-    }
-    _MAKE_RE  = re.compile(r"^0x([0-9a-f]+)\+\s*$", re.I)
-    _BREAK_RE = re.compile(r"^0x([0-9a-f]+)-\s*$", re.I)
+    """Keyboard input handler using the `keyboard` module (W/A/S/D, M auto, Q quit)."""
 
     def __init__(self, controller: Controller):
         self.controller = controller
-        self.keyboard_thread = threading.Thread(target=self.keyboard_listener)
-        self.keyboard_thread.daemon = True
+        self.keyboard_thread = threading.Thread(target=self.keyboard_listener, daemon=True)
         self.keyboard_thread.start()
 
-    # --- public entry ---
     def keyboard_listener(self):
-        # prefer kbd/showkey; fallback to raw stdin
-        # if self._usable_showkey() and self._on_real_vt():
-        #     self._keyboard_listener_kbd()
-        # else:
-        self._keyboard_listener_stdin()
-
-    # --- impl: KBD/showkey path ---
-    def _keyboard_listener_kbd(self):
-        print("[kbd] Using `showkey --scancodes` (Linux VT). Keys: W/A/S/D, M auto, Q quit.")
-        ks = self._KeyState()
-        auto = False
-        send_dt = 0.05
-        last_send = 0.0
-
-        proc = subprocess.Popen(
-            ["showkey", "--scancodes"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=False,
-            bufsize=0,
+        print(
+            """
+[keyboard] Listening for inputs.
+Use W/A/S/D for control, M for auto-forward, Q to quit.
+            """
         )
 
-        try:
-            while True:
-                # non-blocking read of stdout
-                fd = proc.stdout.fileno()
-                r, _, _ = select.select([fd], [], [], 0.02)
-                if r:
-                    chunk = os.read(fd, 4096)
-                    if not chunk:
-                        break
-                    for line in chunk.decode(errors="ignore").splitlines():
-                        m = self._MAKE_RE.match(line) or self._BREAK_RE.match(line)
-                        if not m:
-                            continue
-                        code = int(m.group(1), 16)
-                        key = self._SC_TO_KEY.get(code)
-                        if not key:
-                            continue
-                        if line.endswith('+'):
-                            ks.set_down(key)
-                            if key == 'm': 
-                                auto = True
-                                self.controller.set_auto_mode(True)
-                            if key == 'q':
-                                self.controller.stop()
-                                proc.terminate()
-                                proc.wait(timeout=1)
-                                return
-                        else:
-                            ks.set_up(key)
-
-                # auto cancels if manual input occurs
-                if auto and any(ks.is_down(k) for k in ('w','a','s','d','q')):
-                    auto = False
-                    self.controller.set_auto_mode(False)
-
-                # periodic send
-                now = time.monotonic()
-                if (now - last_send) >= send_dt:
-                    last_send = now
-                    t = 1 if ks.is_down('w') else (-1 if ks.is_down('s') else 0)
-                    s = -1 if ks.is_down('a') else (1 if ks.is_down('d') else 0)
-                    if ks.is_down('w') and ks.is_down('s'): t = 0
-                    if ks.is_down('a') and ks.is_down('d'): s = 0
-                    if auto: t = 1
-                    self.controller.update_axes(s, t)
-
-                if proc.poll() is not None:
-                    break
-        finally:
-            try:
-                if proc.poll() is None:
-                    proc.terminate()
-                    try: proc.wait(timeout=1)
-                    except subprocess.TimeoutExpired: proc.kill()
-            finally:
-                self.controller.stop()
-                print("[kbd] Listener exit.")
-
-    # --- impl: raw-stdin fallback ---
-    def _keyboard_listener_stdin(self):
-        print("[stdin] Raw-mode fallback. Keys: W/A/S/D, M auto, Q quit. (run with -it for TTY)")
-        pressed, last_seen = set(), {}
+        running = True
         auto = False
-        RELEASE_MS = 120
-        POLL = 0.01
-        SEND = 0.02
+        SEND = 0.05
         last_send = 0.0
-
-        def sweep():
-            now = time.monotonic() * 1000
-            for k, t in list(last_seen.items()):
-                if now - t > RELEASE_MS:
-                    pressed.discard(k)
+        last_pressed = 0
 
         try:
-            with self._RawTTY():
-                while True:
-                    print("fucking here")
-                    r, _, _ = select.select([sys.stdin], [], [], POLL)
-                    if r:
-                        data = sys.stdin.buffer.read1(1024) if hasattr(sys.stdin, "buffer") else sys.stdin.read(1)
-                        if not data:
-                            break
-                        if isinstance(data, str):
-                            data = data.encode()
-                        now_ms = time.monotonic() * 1000
-                        for b in data:
-                            c = chr(b).lower()
-                            if c in ('w','a','s','d','m','q'):
-                                pressed.add(c)
-                                last_seen[c] = now_ms
-                                if c == 'm': 
-                                    auto = True
-                                    self.controller.set_auto_mode(True)
-                                if c == 'q':
-                                    self.controller.stop()
-                                    return
-                    sweep()
-
-                    if auto and any(k in pressed for k in ('w','a','s','d','q')):
+            while running:
+                if auto:
+                    if len(keyboard._pressed_events) > 0 and time.monotonic() - last_pressed > 0.3:
                         auto = False
-                        self.controller.set_auto_mode(False)
 
-                    t = 1 if 'w' in pressed else (-1 if 's' in pressed else 0)
-                    s = -1 if 'a' in pressed else (1 if 'd' in pressed else 0)
-                    if 'w' in pressed and 's' in pressed: 
+                    if not self.controller.auto_mode:
+                        auto = False
                         t = 0
-                    if 'a' in pressed and 'd' in pressed: 
-                        s = 0
-                    if auto: 
+                else:
+                    if keyboard.is_pressed('w'):
                         t = 1
+                        last_pressed = time.monotonic()
+                    elif keyboard.is_pressed('s'):
+                        t = -1
+                        last_pressed = time.monotonic()
+                    else:
+                        t = 0
 
-                    now = time.monotonic()
-                    if (now - last_send) >= SEND:
-                        print("calling update axes")
-                        last_send = now
-                        self.controller.update_axes(s, t)
+                    if keyboard.is_pressed('a'):
+                        s = -1
+                        last_pressed = time.monotonic()
+                    elif keyboard.is_pressed('d'):
+                        s = 1
+                        last_pressed = time.monotonic()
+                    else:
+                        s = 0
+
+                    if keyboard.is_pressed('m'):
+                        last_pressed = time.monotonic()
+                        t = 0.9
+                        auto = True
+                        self.controller.set_auto_mode(True)
+
+                # Quit
+                if keyboard.is_pressed('q'):
+                    self.controller.stop()
+                    running = False
+                    break
+
+                # if auto and not self.controller.auto_mode: # DistanceHandler says stop
+                #     auto = False
+                #     self.controller.set_auto_mode(False)
+
+                # stop_auto = False
+                # Auto mode: set when M is pressed; cancel on manual input
+
+                
+                # if auto and stop_auto:
+                #     auto = False
+                #     self.controller.set_auto_mode(False)
+
+
+                # Send at fixed rate
+                # now = time.monotonic()
+                # if (now - last_send) >= SEND:
+                #     last_send = now
+                self.controller.update_axes(s, t)
+                time.sleep(0.05)
         finally:
-            print("*" * 1000)
+            print("calling stop")
             self.controller.stop()
-            print("[stdin] Listener exit.")
-
-    # --- utilities ---
-    def _usable_showkey(self):
-        return shutil.which("showkey") is not None
-
-    def _on_real_vt(self):
-        # best-effort: showkey needs a real console (not PTY)
-        try:
-            return os.isatty(sys.stdin.fileno())
-        except Exception:
-            return False
-
+            print("[keyboard] Listener exit.")
 
 
 class DistanceController:
@@ -407,7 +284,7 @@ class DistanceController:
         # self.distances = collections.deque()
         # self.span =
         # pass
-        self.threshold = 40 # 40cm
+        self.threshold = 65 # 40cm
         self.controller = controller
 
 
@@ -419,11 +296,13 @@ class DistanceController:
         #     if d[0]
 
     def handle_distance_report(self, distance_cm: int):
+        print("Received distance ", distance_cm, self.threshold, PROCESS_DISTANCE, controller.auto_mode)
         # self.distances.append(distance_cm)
-        if distance_cm < self.threshold:
+        if distance_cm < self.threshold and PROCESS_DISTANCE and controller.auto_mode:
             self.stop_auto_move()
     
     def stop_auto_move(self):
+        print("disabling")
         self.controller.set_auto_mode(False)
 
 

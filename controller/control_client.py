@@ -106,6 +106,7 @@ class KeyboardController(traitlets.HasTraits):
         running = True
         new_steering = 0
         new_throttle = 0
+        last_pressed = 0
         try:
             while running:
                 if command_dict["move"]:

@@ -97,6 +97,12 @@ class WSClient:
         self._start_ts = time.time()
         self._stop = threading.Event()
         self._connected = threading.Event()
+        # Track whether we ever had a successful connection in this client lifetime
+        self._had_connection = False
+
+        # Reconnect/backoff settings
+        self._reconnect_initial = 1.0
+        self._reconnect_max = 10.0
 
         self._run_thread = threading.Thread(target=self._run_forever, daemon=True)
         self._status_thread = threading.Thread(target=self._status_loop, daemon=True)
@@ -118,6 +124,7 @@ class WSClient:
     def _on_open(self, ws):
         print(f"[WS] Connected to {self.url}")
         self._connected.set()
+        self._had_connection = True
 
     def _on_close(self, ws, status_code, msg):
         print(f"[WS] Disconnected ({status_code}): {msg}")
@@ -141,8 +148,10 @@ class WSClient:
                 traceback.print_exc()
 
     def _run_forever(self):
+        retry_delay = self._reconnect_initial
         while not self._stop.is_set():
             try:
+                print(f"[WS] Attempting connection to {self.url}")
                 self.wsapp = websocket.WebSocketApp(
                     self.url,
                     on_open=self._on_open,
@@ -150,12 +159,30 @@ class WSClient:
                     on_error=self._on_error,
                     on_message=self._on_message,
                 )
+                # This will block until connection closed / error
                 self.wsapp.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
                 print("[WS] run_forever exception:", e)
 
+            # If stop requested, exit loop
             if self._stop.is_set():
                 break
+
+            # Clear wsapp reference (we'll create a new one on next loop)
+            self.wsapp = None
+
+            # If we never had a successful connection, use exponential backoff
+            if not self._had_connection:
+                print(f"[WS] Connection failed, reconnecting in {retry_delay:.1f}s...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2.0, self._reconnect_max)
+                continue
+
+            # If we had a connection before but got disconnected, try quickly
+            print("[WS] Connection lost, attempting immediate reconnect...")
+            # Reset retry_delay so future connection failures start from initial
+            retry_delay = self._reconnect_initial
+            # small pause to avoid tight restart loop after graceful disconnects
             time.sleep(1.0)
 
     def _status_loop(self):

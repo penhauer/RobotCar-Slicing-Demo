@@ -5,6 +5,9 @@ import threading
 import time
 import traceback
 from typing import Optional
+import subprocess
+import urllib.request
+import urllib.error
 
 import websocket  # pip install websocket-client
 from dotenv import load_dotenv  # pip install python-dotenv
@@ -19,6 +22,24 @@ THROTTLE_GAIN = float(os.getenv("THROTTLE_GAIN", "0.2"))
 STEERING_OFFSET = float(os.getenv("STEERING_OFFSET", "0.3"))
 STATUS_INTERVAL = float(os.getenv("STATUS_INTERVAL", "2.0"))
 ENABLE_DISTANCE_SENSOR = os.getenv("ENABLE_DISTANCE_SENSOR", "false").lower() == "true"
+
+# ---------------- Ping feature configuration (new) ----------------
+PING_INTERVAL = float(os.getenv("PING_INTERVAL", "1.0"))
+ENABLE_PING = os.getenv("ENABLE_PING", "false").lower() == "true"
+PING_SERVER_ADDR = os.getenv("PING_SERVER_ADDR", "")
+METRIC_SERVER_ADDR = os.getenv("METRIC_SERVER_ADDR", "")
+
+# label config sent with metrics (name/value come from env)
+METRIC_LABEL_NAME = os.getenv("METRIC_LABEL_NAME", "source").strip()
+METRIC_LABEL_VALUE = os.getenv("METRIC_LABEL_VALUE", "").strip()
+if not METRIC_LABEL_NAME:
+    METRIC_LABEL_NAME = "source"
+if not METRIC_LABEL_VALUE:
+    try:
+        import socket
+        METRIC_LABEL_VALUE = socket.gethostname()
+    except Exception:
+        METRIC_LABEL_VALUE = "unknown"
 
 # ---------------- Car setup ----------------
 car = None
@@ -61,6 +82,112 @@ def start_distance_sensor():
         distance_sensor = None
 
 
+# ---------------- Ping worker (new) ----------------
+class PingWorker:
+    def __init__(self, target: str, metric_url: str, interval_s: float = 1.0):
+        self.target = target
+        self.metric_url = metric_url
+        self.interval = interval_s
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        if not self.target:
+            print("[Ping] No PING_SERVER_ADDR configured; ping disabled")
+            return
+        print(f"[Ping] Starting ping worker for target {self.target}, interval {self.interval}s")
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        self._thread.join(timeout=1.0)
+
+    def _run(self):
+        while not self._stop.is_set():
+            rtt = self._ping_once(self.target)
+            ts_ms = int(time.time() * 1000)
+            payload = {
+                "type": "ping_rtt",
+                "target": self.target,
+                "rtt_ms": rtt,
+                "ts_ms": ts_ms,
+            }
+            # attach configured label so metric_server can pick it up
+            payload[METRIC_LABEL_NAME] = METRIC_LABEL_VALUE
+            try:
+                self._send_metric(payload)
+            except Exception as e:
+                print("[Ping] Failed to send metric:", e)
+            time.sleep(self.interval)
+
+    def _ping_once(self, host: str) -> Optional[float]:
+        # Use system ping to measure RTT (one probe). Returns milliseconds or None.
+        try:
+            # -c 1 send one packet, -W 1 timeout 1s (Linux). Adjust if macOS required.
+            proc = subprocess.run(
+                ["ping", "-c", "1", "-W", "1", host],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=3.0,
+            )
+            out = proc.stdout + proc.stderr
+            if proc.returncode != 0:
+                # no reply
+                return None
+            # look for "time=123.456 ms"
+            for part in out.split():
+                if part.startswith("time=") and part.endswith("ms"):
+                    # part like time=12.345ms or time=12.345 ms (handle both)
+                    val = part.replace("time=", "").replace("ms", "")
+                    try:
+                        return float(val)
+                    except Exception:
+                        continue
+                # handle "time=12.345" with separate "ms"
+                if "time=" in part:
+                    try:
+                        val = part.split("time=")[1].rstrip()
+                        if val.endswith("ms"):
+                            val = val[:-2]
+                        return float(val)
+                    except Exception:
+                        continue
+            # fallback parse: find "time=" anywhere
+            idx = out.find("time=")
+            if idx != -1:
+                tail = out[idx:idx+20]
+                import re
+                m = re.search(r"time=([0-9\.]+)", tail)
+                if m:
+                    return float(m.group(1))
+            return None
+        except Exception:
+            return None
+
+    def _send_metric(self, payload: dict):
+        if not self.metric_url:
+            # no metric server configured; just print
+            print("[Ping] Metric payload:", payload)
+            return
+
+        data = json.dumps(payload).encode("utf-8")
+        # Only HTTP(S) transport for metrics (no websocket)
+        if self.metric_url.startswith("http://") or self.metric_url.startswith("https://"):
+            req = urllib.request.Request(
+                self.metric_url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                    _ = resp.read()  # consume response
+            except Exception as e:
+                print("[Ping] HTTP metric send failed:", e)
+        else:
+            # unknown/unsupported scheme — just log the payload
+            print("[Ping] Unsupported metric server URL scheme, cannot send:", self.metric_url)
+            print(payload)
+
+
 # ---------------- Control handling ----------------
 def control_the_car(d: dict):
     """
@@ -80,7 +207,7 @@ def control_the_car(d: dict):
             car._on_steering(d)
         elif t == "throttle":
             d["new"] = d["throttle"]
-            car. _on_throttle(d)
+            car._on_throttle(d)
         else:
             raise Exception(f"Unknown command type '{t}'")
     except Exception as e:
@@ -226,6 +353,12 @@ def main():
     client = WSClient(url, status_interval_s=STATUS_INTERVAL)
     client.start()
 
+    # Start ping worker if enabled
+    ping_worker = None
+    if ENABLE_PING:
+        ping_worker = PingWorker(PING_SERVER_ADDR, METRIC_SERVER_ADDR, interval_s=PING_INTERVAL)
+        ping_worker.start()
+
     try:
         while True:
             time.sleep(1)
@@ -235,6 +368,8 @@ def main():
         client.stop()
         if distance_sensor:
             distance_sensor.stop()
+        if ping_worker:
+            ping_worker.stop()
 
 
 if __name__ == "__main__":

@@ -128,10 +128,9 @@ class PingWorker:
                 ["ping", "-c", "1", "-W", "1", host],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
                 timeout=3.0,
             )
-            out = proc.stdout + proc.stderr
+            out = str(proc.stdout + proc.stderr)
             if proc.returncode != 0:
                 # no reply
                 return None
@@ -162,7 +161,8 @@ class PingWorker:
                 if m:
                     return float(m.group(1))
             return None
-        except Exception:
+        except Exception as e:
+            print(e)
             return None
 
     def _send_metric(self, payload: dict):
